@@ -35,6 +35,8 @@ Choisis l'édition (une branche du dépôt) d'après ses réponses :
 | `cli-ia` | Windows, Linux, ou macOS sans application | pont, IA facultative, skill |
 | `outil` | « juste la connexion » | pont seul : synchronisation, rangement par section, index Markdown |
 
+Passer par ce skill, c'est utiliser un agent : recommande `cli-ia`, ou `main` sur macOS si l'utilisateur veut l'application. L'édition `outil` n'a pas de commande `skill` pour te relier à l'installation : ne la propose que s'il la demande.
+
 ## 3. Prérequis
 
 - **Python 3.9 ou plus récent**, sans autre paquet : `python3 --version` sous macOS et Linux, `py --version` sous Windows. S'il manque, propose https://www.python.org/downloads/. Sous Windows, coche « Add python.exe to PATH ».
