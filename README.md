@@ -1,6 +1,6 @@
 # Moodle Bridge
 
-**Tes cours Moodle dans un dossier de ton ordinateur, à jour tout seul.**
+**Tes cours Moodle dans un dossier de ton ordinateur, à jour tout seul.** Édition `cli-ia` : la synchronisation, une IA facultative et le skill pour tes agents, sans interface graphique. Pensée pour **Windows**, elle fonctionne aussi sous macOS et Linux.
 
 Moodle Bridge se connecte à ton Moodle comme le fait l'appli mobile officielle et récupère automatiquement :
 - les **documents** des cours (PDF, diaporamas, sujets, archives…), rangés dans un dossier par cours ;
@@ -16,44 +16,54 @@ Il tient à jour un **tableau de bord** en Markdown (`Moodle.md`) : à rendre bi
 
 ## Éditions
 
-Le dépôt a plusieurs branches. Choisis la tienne :
+Le dépôt a plusieurs branches. Tu es sur **`cli-ia`** :
 
 | Branche | Pour qui | Contenu |
 |---|---|---|
-| **`main`** | tout le monde, clé en main | tout : synchronisation, IA facultative, application de barre des menus (macOS), notes, skill pour agents IA |
-| [`cli-ia`](../../tree/cli-ia) | Windows, Linux, ou macOS sans application | synchronisation, IA facultative par ligne de commande, skill pour agents IA |
+| [`main`](../../tree/main) | tout le monde, clé en main | tout : synchronisation, IA facultative, application de barre des menus (macOS), notes, skill pour agents IA |
+| **`cli-ia`** | Windows, Linux, ou macOS sans application | synchronisation, IA facultative par ligne de commande, skill pour agents IA |
 | [`outil`](../../tree/outil) | « juste la connexion » | synchronisation, rangement par section Moodle, tableau de bord Markdown ; aucune IA, aucune interface |
 | [`skill`](../../tree/skill) | utilisateurs d'agents IA | le skill seul : ton agent (Claude Code, Codex…) te guide dans l'installation |
 
 ## Prérequis
 
 - **Python 3.9 ou plus récent** :
+  - Windows : installe Python depuis https://www.python.org/downloads/ en cochant « Add python.exe to PATH ». Vérifie ensuite avec `py --version` dans PowerShell. Le Microsoft Store convient aussi.
   - macOS : `python3 --version` dans le Terminal. S'il manque, macOS propose de l'installer, sinon passe par https://www.python.org/downloads/.
-  - Windows : installe Python depuis https://www.python.org/downloads/ en cochant « Add python.exe to PATH ». Vérifie ensuite avec `py --version`.
   - Linux : déjà présent sur la plupart des distributions.
 - **git**, ou le bouton *Code → Download ZIP* de GitHub.
 - Un Moodle qui autorise l'**appli mobile** : c'est le cas de la plupart des établissements. L'installation le vérifie.
 
 ## Installation
 
+Sous Windows, dans PowerShell :
+
+```powershell
+git clone --branch cli-ia https://github.com/ArthurArctique/Moodle-Bridge.git
+cd Moodle-Bridge
+py install.py
+```
+
+Sous macOS ou Linux :
+
 ```bash
-git clone https://github.com/ArthurArctique/Moodle-Bridge.git
+git clone --branch cli-ia https://github.com/ArthurArctique/Moodle-Bridge.git
 cd Moodle-Bridge
 python3 install.py
 ```
 
-Sous Windows, lance `py install.py` à la place de `python3 install.py`.
+Sans git : sur GitHub, choisis la branche `cli-ia`, puis *Code → Download ZIP*, décompresse l'archive et lance `py install.py` dans ce dossier.
 
 L'assistant pose quelques questions. Chacune a une valeur par défaut : Entrée la garde.
 
 1. **L'adresse de ton Moodle** : copie celle de la barre d'adresse, n'importe quelle page de Moodle convient.
-2. **Où ranger tes cours** : `~/Moodle` par défaut, ou un dossier de ton coffre Obsidian s'il en trouve un.
+2. **Où ranger tes cours** : le dossier `Moodle` de ton dossier personnel par défaut (`C:\Users\<toi>\Moodle` sous Windows), ou un dossier de ton coffre Obsidian s'il en trouve un.
 3. **L'index et les textes** : `Moodle.md` et `Textes Moodle/`, dans ce dossier.
 4. **Une IA** pour ranger les fichiers ambigus et résumer les annonces : facultatif, voir [IA](#ia-facultative).
 5. **La fréquence** de synchronisation : toutes les 2 h par défaut.
 6. **La connexion à Moodle**, voir juste en dessous.
 7. **Les cours à suivre** : tous par défaut, tu peux en exclure.
-8. **Pour finir** : première synchronisation, synchronisation automatique, puis selon l'édition l'application macOS et le skill pour tes agents IA.
+8. **Pour finir** : première synchronisation, synchronisation automatique, puis le skill pour tes agents IA.
 
 Tu peux relancer `install.py` quand tu veux, par exemple pour ajouter des cours ou activer l'IA. L'installation est mise à jour sans rien perdre.
 
@@ -136,7 +146,6 @@ flowchart LR
         P --> I[📄 Moodle.md<br/>tableau de bord]
         P --> X[📄 Textes Moodle<br/>consignes, annonces, MCC]
         P --> S[(état .moodle-bridge)]
-        S --> A[Application barre des menus<br/>macOS]
     end
 
     D & I & X --> R[Obsidian, VS Code<br/>ou autre lecteur Markdown]
@@ -147,7 +156,7 @@ flowchart LR
 2. **Moodle Bridge** demande à Moodle ce qui a changé, avec le jeton rangé dans le coffre du système. Il télécharge les nouveaux documents et les range dans ton dossier.
 3. **Le rangement** se fait par section Moodle, ou par séance (CM/TD/TP) avec l'aide d'une IA. Un fichier incertain va dans `_a_classer/` plutôt que dans un mauvais dossier.
 4. **Le tableau de bord et les textes** sont réécrits à chaque passage. Ne les modifie pas : tes notes vont dans tes propres fichiers.
-5. **Tu lis** le tout dans Obsidian ou VS Code. **Tes agents IA** y accèdent grâce au skill. **L'application de barre des menus** (macOS) affiche l'état et les nouveautés sans jamais contacter Moodle elle-même.
+5. **Tu lis** le tout dans Obsidian ou VS Code. **Tes agents IA** y accèdent grâce au skill.
 
 Le fonctionnement interne (modules, état, règles de rangement) est décrit dans [`docs/architecture.md` de la branche `outil`](../../blob/outil/docs/architecture.md), et pour les agents dans [skill/references/](skill/references/).
 
@@ -167,6 +176,26 @@ python3 scripts/moodle_bridge.py texts   --config ~/Moodle/.moodle-bridge/config
 - **Un fichier mal rangé** : déplace-le aussi. Rien n'est retéléchargé.
 - **Un nouveau semestre** : relance `install.py`, ou utilise `courses --add-all`.
 - **Les réglages** sont dans `.moodle-bridge/config.json` : voir [docs/configuration.md](docs/configuration.md).
+
+Sous Windows, les mêmes commandes dans PowerShell :
+
+```powershell
+py scripts\moodle_bridge.py sync   --config $HOME\Moodle\.moodle-bridge\config.json
+py scripts\moodle_bridge.py status --config $HOME\Moodle\.moodle-bridge\config.json
+```
+
+## Sous Windows
+
+| Quoi | Où |
+|---|---|
+| jeton | *Gestionnaire d'identification → Informations d'identification Windows → génériques*, entrée `moodle-bridge:…` |
+| synchronisation automatique | *Planificateur de tâches*, dossier **MoodleBridge** : à l'ouverture de session puis toutes les 2 h, sans fenêtre (`pythonw.exe`) |
+| journaux de la tâche | `%LOCALAPPDATA%\moodle-bridge\logs\` |
+| skill des agents | `%USERPROFILE%\.claude\skills\moodle-bridge` et `%USERPROFILE%\.codex\skills\moodle-bridge` |
+| notifications | notifications Windows (nouveaux fichiers, jeton expiré) |
+
+- **IA** : indique le chemin complet de la commande, que donne `where claude` ou `where codex` (souvent `…\AppData\Roaming\npm\codex.cmd`). La tâche planifiée ne connaît pas toujours le `PATH` de ton terminal.
+- **Obsidian** : ouvre le dossier des cours comme coffre et épingle `Moodle.md`. C'est la façon la plus simple de suivre tes cours au quotidien : le tableau de bord se met à jour tout seul, et chaque lien ouvre le PDF.
 
 ## IA (facultative)
 
@@ -194,17 +223,6 @@ python3 scripts/moodle_bridge.py skill install --config ~/Moodle/.moodle-bridge/
 
 Pour un autre agent, utilise `--dest <dossier de skills de l'agent>`. Tu n'as pas encore installé Moodle Bridge ? La branche [`skill`](../../tree/skill) contient un skill d'amorçage : ton agent te pose les bonnes questions et fait l'installation avec toi.
 
-## Application de barre des menus (macOS)
-
-L'application affiche dans la barre des menus :
-- une icône d'état : à jour, en cours, en retard ou en échec ;
-- le nombre de nouveaux documents ;
-- un panneau avec les derniers documents, les échéances et les annonces (résumé au clic) ;
-- les nouvelles notes publiées sur Moodle, en « mystère » jusqu'à ce que tu cliques pour les découvrir (facultatif, `notes.enabled`) ;
-- un bouton « Synchroniser ».
-
-Elle est compilée sur ta machine pendant l'installation, ce qui demande les outils de développement d'Apple : `xcode-select --install`. Voir [docs/application-macos.md](docs/application-macos.md).
-
 ## Sécurité et vie privée
 
 - Le jeton reste dans le coffre-fort de ton système. Il n'est jamais écrit dans un fichier, ni dans les journaux, ni dans le tableau de bord. Tous les liens sont nettoyés du jeton.
@@ -219,7 +237,6 @@ python3 scripts/moodle_bridge.py uninstall --config ~/Moodle/.moodle-bridge/conf
 ```
 
 Cette commande retire la synchronisation automatique et le jeton. Tes fichiers restent en place. Ensuite, si tu veux tout effacer :
-- l'application macOS : `menubar uninstall` ;
 - le skill : supprime son dossier dans `~/.claude/skills` ou `~/.codex/skills` ;
 - le reste : supprime le dossier du dépôt, puis `.moodle-bridge/` dans ton dossier de cours.
 
@@ -227,7 +244,7 @@ Cette commande retire la synchronisation automatique et le jeton. Tes fichiers r
 
 Voir [docs/depannage.md](docs/depannage.md). Le premier réflexe est `status`, qui donne le dernier succès, le dernier échec et l'état de la tâche planifiée.
 
-> **Windows et Linux** : le support est récent. La synchronisation, le coffre du système et la tâche planifiée sont prévus pour ces systèmes, mais ils ont surtout été éprouvés sur macOS. Signale tout souci dans une *issue*.
+> **Windows et Linux** : le support est récent. La synchronisation, le coffre du système et la tâche planifiée sont prévus pour ces systèmes, mais l'outil a surtout été éprouvé sur macOS. Signale tout souci dans une *issue*.
 
 ## Licence
 

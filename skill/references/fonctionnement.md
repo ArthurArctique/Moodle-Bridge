@@ -16,7 +16,7 @@ Le pont est **en lecture seule côté Moodle** : il ne rend aucun devoir, ne pos
 | `<env>/.moodle-bridge/logs/sync.log` | journal du pont |
 | `<env>/Moodle.md` (`index.path`) | index, réécrit à chaque appel |
 | `<env>/Textes Moodle/<CODE>.md` (`texts.dir`) | textes de chaque cours |
-| cache du système (`~/Library/Caches/moodle-bridge`, `%LOCALAPPDATA%\moodle-bridge\Cache`, `~/.cache/moodle-bridge`) | téléchargements en cours, état pour l'application |
+| cache du système (`~/Library/Caches/moodle-bridge`, `%LOCALAPPDATA%\moodle-bridge\Cache`, `~/.cache/moodle-bridge`) | téléchargements en cours |
 | journaux des tâches planifiées (`~/Library/Logs/moodle-bridge`, `%LOCALAPPDATA%\moodle-bridge\logs`, `~/.local/share/moodle-bridge/logs`) | sortie de chaque passage planifié |
 
 ## Synchronisation
@@ -79,7 +79,7 @@ Il les nettoie du HTML (Markdown lisible, liens sans jeton) et les conserve dans
 
 ## Résumés des annonces
 
-Si un modèle est configuré, chaque annonce longue est résumée en quelques lignes, une seule fois, et de nouveau seulement si son texte change. Le résumé s'affiche sous l'annonce dans l'index et au clic dans l'application. Une annonce courte est montrée telle quelle, sans modèle. Réglages : `summaries` (`enabled: false` pour s'en passer). Un moteur, une commande ou un modèle laissés vides reprennent ceux de `classify`.
+Si un modèle est configuré, chaque annonce longue est résumée en quelques lignes, une seule fois, et de nouveau seulement si son texte change. Le résumé s'affiche sous l'annonce dans l'index. Une annonce courte est montrée telle quelle, sans modèle. Réglages : `summaries` (`enabled: false` pour s'en passer). Un moteur, une commande ou un modèle laissés vides reprennent ceux de `classify`.
 
 ## Index
 
@@ -121,30 +121,6 @@ Avec `zotero.enabled`, le pont ne copie jamais un support de cours (diaporama de
 4. il importe avec l'outil Zotero de l'environnement.
 
 Au passage suivant, `sync` retrouve le fichier dans `zotero.search_roots` par son empreinte et supprime la copie mise de côté.
-
-## Notes (édition `main`)
-
-Le relevé des notes est une **tâche à part**, plus fréquente que la synchronisation : `notes.interval_minutes`, 15 min par défaut. Il fait des appels déterministes (`gradereport_user_get_grade_items`) et ne consomme aucun token tant qu'aucune note n'apparaît. Il est actif seulement si `notes.enabled` est vrai.
-
-- **Mystère** :
-  - au premier relevé, les notes déjà publiées sont seulement mémorisées ;
-  - ensuite, une note nouvelle devient un mystère : le modèle choisit un emoji, une couleur et une courte énigme sans chiffre, et la notification les envoie sans la valeur ;
-  - la valeur n'apparaît qu'après « Découvrir » dans l'application.
-- **Confidentialité** : tant qu'une note est un mystère, un agent ne lit pas sa valeur et ne la montre pas. Il n'affiche pas `notes-state.json` brut et ne décode jamais `notes-sealed.json`.
-- **Report dans un classeur Excel** (facultatif) : une note découverte est écrite dans `notes.workbook.path`, feuille `notes.workbook.sheet`, case « Note k » de la ligne de l'élément, selon `notes.workbook.map`. L'écriture refuse un classeur ouvert dans Excel, n'écrase jamais une formule, vérifie que rien d'autre ne change et fait une sauvegarde horodatée. `notes setup` installe une seule fois openpyxl dans un environnement Python dédié.
-- `notes items` liste les éléments suivis, sans valeur, pour remplir `notes.workbook.map` : `{"<courseid>/<itemid>": {"element": "ABC", "note": 1}}`.
-
-## Application de barre des menus (macOS, édition `main`)
-
-L'application `~/Applications/Moodle Bridge.app` ne contacte jamais Moodle : elle lit l'état que le pont écrit dans le cache. Elle affiche :
-- l'état du pont : à jour, en cours, en retard ou en échec ;
-- les derniers documents et leur dossier ;
-- les échéances ;
-- les annonces, dont le résumé s'affiche au clic ;
-- les notes mystère ;
-- un bouton « Synchroniser », équivalent de `schedule kick`.
-
-Si l'icône n'apparaît pas alors que l'application tourne (`pgrep -x MoodleBridge`), c'est qu'elle est masquée par un gestionnaire de barre des menus ou par manque de place. Après une mise à jour du dépôt : `menubar install`.
 
 ## Jeton
 

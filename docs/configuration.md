@@ -64,21 +64,6 @@ Le moteur d'IA lui-même est décrit dans [ia.md](ia.md).
 
 Après avoir changé l'intervalle, réinstalle la tâche : `schedule install`. `schedule uninstall` arrête la synchronisation automatique ; `schedule kick` lance un passage tout de suite.
 
-## Les notes (édition `main`, macOS)
-
-Désactivé par défaut. Quand une note est publiée sur Moodle, l'application de barre des menus l'annonce en **mystère** : un emoji, une couleur et une énigme choisis par l'IA, sans la valeur. Tu la découvres d'un clic.
-
-1. Dans `config.json` : `"notes": {"enabled": true}`.
-2. Relevé automatique, toutes les 15 min par défaut (`notes.interval_minutes`) : `notes schedule install --config …`.
-3. Vérifier : `notes status --config …`. Au premier relevé, les notes déjà publiées sont seulement mémorisées.
-
-| Clé | Rôle |
-|---|---|
-| `notes.exclude_modules` | activités jamais suivies : quiz d'entraînement, présence, SCORM… |
-| `notes.exclude_items`, `notes.include_items` | filtres sur le nom de l'élément (expressions régulières) ; l'inclusion l'emporte |
-| `notes.mystery.enabled` | `false` : notification sans énigme, avec 🎁 gris |
-| `notes.workbook` | report facultatif de chaque note découverte dans un classeur Excel : `path`, `sheet` et `map`, que `notes items` aide à remplir. La feuille doit avoir une colonne « Élément » et des colonnes « Note 1 », « Note 2 »… ; seule la case visée change, jamais une formule. `notes setup` installe une fois openpyxl dans un Python dédié |
-
 ## Pour les agents IA
 
-La liste complète des clés, avec les supports de cours envoyés vers Zotero et le relevé des notes, est dans [skill/references/fonctionnement.md](../skill/references/fonctionnement.md).
+La liste complète des clés, avec les supports de cours envoyés vers Zotero, est dans [skill/references/fonctionnement.md](../skill/references/fonctionnement.md).

@@ -13,7 +13,7 @@ Pour l'agent qui accompagne une installation. Les étapes sont détaillées pour
 5. **Fréquence** : 120 min par défaut, 15 min au minimum.
 6. **Connexion à Moodle** : voir plus bas. Le jeton est vérifié auprès de Moodle.
 7. **Cours** : tous les cours où l'utilisateur est inscrit, chacun dans un dossier tiré de son nom court. L'utilisateur peut en exclure.
-8. **Première synchronisation**, **tâche planifiée**, puis selon l'édition l'**application** macOS et le **skill**.
+8. **Première synchronisation**, **tâche planifiée**, puis le **skill**.
 
 Relancer l'assistant sur un dossier déjà installé met l'installation à jour : les cours et réglages existants sont conservés, les nouveaux cours ajoutés.
 
@@ -36,14 +36,13 @@ Utile quand c'est l'agent qui pose les questions. Les réponses sont passées en
 | `exclude_courses` | identifiants Moodle des cours à ne pas suivre | `[]` |
 | `first_sync` | lancer la première synchronisation | `true` |
 | `schedule` | installer la tâche planifiée (**accord de l'utilisateur requis**) | `true` |
-| `menubar` | installer l'application macOS (**accord requis**) | `true` |
 | `skill` | `claude`, `codex`, `both` ou `none` | `none` |
 
 Exemple :
 
 ```json
 {"site": "https://moodle.exemple.fr", "env": "~/Moodle", "engine": "codex-cli", "model": "<modèle>",
- "schedule": true, "menubar": false, "skill": "codex"}
+ "schedule": true, "skill": "codex"}
 ```
 
 La sortie est un JSON qui contient `config`, `env`, `steps` (étapes faites) et `pending`. Tant que le jeton manque, `pending` vaut `["token"]` et `next` donne la commande à transmettre à l'utilisateur. Une fois qu'il s'est connecté, relancer la même commande.
@@ -90,12 +89,6 @@ L'assistant convient à un dossier neuf. Pour brancher le pont sur une arboresce
   - l'interdiction d'écrire vers Moodle et d'afficher le jeton.
 
 Pour un premier passage sur une arborescence existante, lancer d'abord `sync --dry-run`. Présenter ensuite le plan, ajouter les corrections dans `overrides`, puis lancer `sync`.
-
-## Application de barre des menus (macOS, édition `main`)
-
-- **Prérequis** : macOS 13 ou plus récent, et `swiftc`. S'il manque, l'utilisateur lance lui-même `xcode-select --install`.
-- **Installation** : `menubar install --config …` compile l'application sur place, l'installe dans `~/Applications/Moodle Bridge.app` et la lance. Une seule application sert tous les environnements du Mac.
-- **Ouverture à la connexion** : c'est l'utilisateur qui l'active, dans le menu ⋯ du panneau.
 
 ## Skill des agents
 
