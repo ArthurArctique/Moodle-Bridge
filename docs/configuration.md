@@ -1,0 +1,84 @@
+# Réglages
+
+Les réglages d'une installation sont dans `<dossier des cours>/.moodle-bridge/config.json`. Le plus simple pour les modifier est de **relancer `install.py`** : il reprend l'installation existante. Pour aller plus loin, édite le fichier : c'est du JSON, et toute clé absente garde sa valeur par défaut. Lance ensuite `status` pour vérifier que le fichier est toujours lisible.
+
+## Les cours
+
+Chaque cours suivi a une entrée sous `courses`, repérée par son identifiant Moodle (`courses --json` les liste) :
+
+```json
+"courses": {
+  "1234": {"dest": "Algèbre", "code": "ALG", "mode": "mirror", "name": "Algèbre linéaire"},
+  "5678": {"dest": "Biologie/Cellulaire", "code": "BIO", "mode": "classify"},
+  "9999": {"skip": true}
+}
+```
+
+| Clé | Rôle |
+|---|---|
+| `dest` | dossier du cours, relatif au dossier des cours ; il peut déjà exister et contenir tes fichiers |
+| `code` | nom court affiché dans le tableau de bord |
+| `mode` | `mirror` : un sous-dossier par section Moodle. `classify` : dossiers par séance (`CM/CM01`, `TD/TD03`…), avec l'IA pour les cas ambigus |
+| `skip` | `true` pour ne plus suivre ce cours |
+| `routes` | envoyer certaines sections vers un autre dossier, par exemple `[{"sections": "^TP", "dest": "Info/TP", "code": "TP"}]` (expression régulière sur le nom de la section) |
+
+`courses --add-all` ajoute d'un coup tous les nouveaux cours, dans le mode de `default_mode`.
+
+## Le rangement par séance (`classify`)
+
+| Clé | Rôle |
+|---|---|
+| `classify.rules` | tes conventions, en quelques phrases, données telles quelles à l'IA |
+| `classify.new_dir_patterns` | dossiers que l'IA a le droit de créer (expressions régulières) ; les dossiers existants sont toujours permis |
+| `classify.min_confidence` | en dessous de ce niveau (0,8 par défaut), le fichier va dans `_a_classer/` |
+| `classify.inbox` | nom du dossier d'attente (`_a_classer`) |
+| `overrides` | corrections durables : `"<cours>/<activité>/<fichier>": "TD/TD07"`, avec la clé lue dans `state.json` |
+
+Le moteur d'IA lui-même est décrit dans [ia.md](ia.md).
+
+## Ce qui est téléchargé
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `exclude.list_only_mimetypes` | `["video/", "audio/"]` | listés dans le tableau de bord avec leur lien Moodle, jamais téléchargés |
+| `exclude.max_size_mb` | `200` | fichiers plus lourds seulement listés |
+| `exclude.modnames` | pages, livres, leçons, SCORM… | activités web ignorées comme fichiers ; le texte des pages est quand même conservé |
+
+## Le tableau de bord et les textes
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `index.path` | `Moodle.md` | emplacement du tableau de bord (`null` : aucun) |
+| `index.news_days` | `7` | durée d'affichage d'un nouveau fichier dans « Nouveautés » |
+| `index.announcements_per_course` | `5` | annonces récentes relevées par cours |
+| `texts.dir` | `Textes Moodle` | un fichier Markdown par cours avec ses textes |
+| `texts.mcc_title`, `texts.mcc_content` | motifs français | repérage des modalités de contrôle, à adapter pour un Moodle dans une autre langue |
+| `texts.enabled` | `true` | `false` : ne conserver aucun texte |
+
+## La synchronisation automatique
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `schedule.interval_minutes` | `120` | intervalle entre deux passages |
+| `notify` | `true` | notifications du système (nouveaux fichiers, jeton expiré, modalités de contrôle modifiées) |
+
+Après avoir changé l'intervalle, réinstalle la tâche : `schedule install`. `schedule uninstall` arrête la synchronisation automatique ; `schedule kick` lance un passage tout de suite.
+
+## Les notes (édition `main`, macOS)
+
+Désactivé par défaut. Quand une note est publiée sur Moodle, l'application de barre des menus l'annonce en **mystère** : un emoji, une couleur et une énigme choisis par l'IA, sans la valeur. Tu la découvres d'un clic.
+
+1. Dans `config.json` : `"notes": {"enabled": true}`.
+2. Relevé automatique, toutes les 15 min par défaut (`notes.interval_minutes`) : `notes schedule install --config …`.
+3. Vérifier : `notes status --config …`. Au premier relevé, les notes déjà publiées sont seulement mémorisées.
+
+| Clé | Rôle |
+|---|---|
+| `notes.exclude_modules` | activités jamais suivies : quiz d'entraînement, présence, SCORM… |
+| `notes.exclude_items`, `notes.include_items` | filtres sur le nom de l'élément (expressions régulières) ; l'inclusion l'emporte |
+| `notes.mystery.enabled` | `false` : notification sans énigme, avec 🎁 gris |
+| `notes.workbook` | report facultatif de chaque note découverte dans un classeur Excel : `path`, `sheet` et `map`, que `notes items` aide à remplir. La feuille doit avoir une colonne « Élément » et des colonnes « Note 1 », « Note 2 »… ; seule la case visée change, jamais une formule. `notes setup` installe une fois openpyxl dans un Python dédié |
+
+## Pour les agents IA
+
+La liste complète des clés, avec les supports de cours envoyés vers Zotero et le relevé des notes, est dans [skill/references/fonctionnement.md](../skill/references/fonctionnement.md).

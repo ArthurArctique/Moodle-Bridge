@@ -1,0 +1,17 @@
+# Données d'une installation : adresse du Moodle, cours suivis, état, journaux
+.moodle-bridge/
+*.moodle-part
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# Systèmes et éditeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+# Application compilée
+*.app/
+build/
