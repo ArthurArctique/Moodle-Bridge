@@ -522,7 +522,6 @@ class TextTests(unittest.TestCase):
         self.assertNotIn("## Modalités de contrôle", (tmp / "Vault/Moodle.md").read_text())
 
 
-@unittest.skipIf(snapshot is None, "édition sans application de barre des menus")
 class VaultTests(unittest.TestCase):
     """Coffre Obsidian : notes reliées, régénérées sans modèle de langage."""
 
@@ -605,7 +604,10 @@ class VaultTests(unittest.TestCase):
         self.assertFalse(stale.exists())
 
     def test_grades_never_show_a_mystery(self):
-        from mb import notes
+        try:
+            from mb import notes
+        except ImportError:
+            self.skipTest("édition sans relevé des notes")
         tmp, cfg, _client = self._sync(notes={"enabled": True})
         grade = lambda raw: {"raw": raw, "min": 0, "max": 20, "formatted": str(raw)}  # noqa: E731
         state = notes.empty_state()
@@ -634,6 +636,7 @@ class VaultTests(unittest.TestCase):
         self.assertFalse((board / "Notes.md").exists())
 
 
+@unittest.skipIf(snapshot is None, "édition sans application de barre des menus")
 class SnapshotTests(unittest.TestCase):
     def _item(self, name, placed_at, status="placed", folder="Cours/TST/TD/TD03"):
         return {"courseid": 10, "course": "M1_TST", "code": "TST", "filename": name, "status": status,
