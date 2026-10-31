@@ -27,7 +27,7 @@ Il tient à jour un **coffre Obsidian** bien rangé : une page d'accueil, une no
 
 ## Le plus rapide : confie l'installation à ton agent IA
 
-Pour gagner du temps sans lire la suite, clone le dépôt et ouvre-le avec Claude Code, Codex ou Gemini CLI :
+Tu ne veux vraiment rien comprendre, juste que ça marche, et vite ? Soit, on ne juge pas. Enfin, un peu. Clone le dépôt et ouvre-le avec Claude Code, Codex ou Gemini CLI :
 
 ```bash
 git clone https://github.com/ArthurArctique/Moodle-Bridge.git
@@ -38,6 +38,8 @@ claude      # ou codex, ou gemini
 Puis demande-lui : *« Installe Moodle Bridge pour moi. »*
 
 L'agent trouve ses consignes dans le dépôt ([`AGENTS.md`](AGENTS.md)). Il te pose quelques questions : ton Moodle, où ranger tes cours, avec ou sans IA. Ensuite il installe tout. Une seule étape te revient : la connexion à Moodle, dans ton propre terminal, pour que ton mot de passe ne passe jamais par l'agent.
+
+Pendant qu'il travaille, tu pourrais lire la suite de ce README. Quelqu'un a passé des soirées à l'écrire, pour toi. Mais fais comme tu veux.
 
 ## Éditions
 
