@@ -2,7 +2,7 @@
 
 Cette branche contient **uniquement le skill** de [Moodle Bridge](../../tree/main) : un mode d'emploi pour ton agent IA. Il fonctionne avec Claude Code, Codex, et tout agent qui lit les fichiers `SKILL.md`.
 
-Moodle Bridge synchronise en lecture seule les documents, devoirs, échéances et annonces de ton Moodle dans un dossier de ton ordinateur, avec un tableau de bord Markdown à lire dans Obsidian ou VS Code. Le détail est dans le [README principal](../../tree/main#readme).
+Moodle Bridge synchronise en lecture seule les documents, devoirs, échéances et annonces de ton Moodle dans un dossier de ton ordinateur, avec un coffre Obsidian bien rangé : une note par matière, une par devoir, les échéances, les annonces et les modalités de contrôle. Le détail est dans le [README principal](../../tree/main#readme).
 
 ## Ce que fait ce skill
 
@@ -10,7 +10,7 @@ Moodle Bridge synchronise en lecture seule les documents, devoirs, échéances e
    - il te demande ton système, si tu veux une IA pour ranger les fichiers, l'application macOS et ton lecteur Markdown ;
    - il choisit l'édition qui te convient (`main` ou `cli-ia`) et clone le dépôt ;
    - il lance l'assistant d'installation.
-2. **Une fois l'installation faite**, il se remplace par un skill relié à ton installation : il sait où sont tes cours, le tableau de bord, les réglages et les journaux, et quelles commandes lancer selon ta demande.
+2. **Une fois l'installation faite**, il se remplace par un skill relié à ton installation : il sait où sont tes cours, le coffre Obsidian, les réglages et les journaux, et quelles commandes lancer selon ta demande.
 
 La **connexion à Moodle** reste toujours entre tes mains. L'agent te donne une commande à lancer dans ton propre terminal, et ton mot de passe comme ton jeton ne passent jamais par la conversation.
 
