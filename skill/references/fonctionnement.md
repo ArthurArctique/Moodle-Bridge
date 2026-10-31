@@ -1,6 +1,6 @@
 # Fonctionnement du pont
 
-Un script Python déterministe, sans dépendance hors de la bibliothèque standard, fait tout le travail fiable : interroger l'API, détecter ce qui est nouveau, télécharger, ranger sans jamais écraser, conserver les textes et écrire l'index. Un modèle de langage n'intervient, si on l'a configuré, que pour choisir le dossier d'un fichier ambigu et résumer une annonce. Un passage sans nouveauté ne consomme donc aucun token.
+Un script Python déterministe, sans dépendance hors de la bibliothèque standard, fait tout le travail fiable : interroger l'API, détecter ce qui est nouveau, télécharger, ranger sans jamais écraser, conserver les textes et écrire le coffre Obsidian. Un modèle de langage n'intervient, si on l'a configuré, que pour choisir le dossier d'un fichier ambigu et résumer une annonce. Un passage sans nouveauté ne consomme donc aucun token.
 
 Le pont est **en lecture seule côté Moodle** : il ne rend aucun devoir, ne poste rien et ne marque rien comme lu.
 
@@ -14,8 +14,9 @@ Le pont est **en lecture seule côté Moodle** : il ne rend aucun devoir, ne pos
 | `<env>/.moodle-bridge/state.json` | état : fichiers suivis et leur emplacement, textes, échéances, annonces, résumés |
 | `<env>/.moodle-bridge/plan.json` | décisions d'une simulation (`sync --dry-run`), reprises au passage réel |
 | `<env>/.moodle-bridge/logs/sync.log` | journal du pont |
-| `<env>/Moodle.md` (`index.path`) | index, réécrit à chaque appel |
-| `<env>/Textes Moodle/<CODE>.md` (`texts.dir`) | textes de chaque cours |
+| `<env>/Tableau de bord/` (`vault.dir`) | coffre Obsidian : notes générées, réécrites à chaque appel |
+| `<env>/Moodle.md` (`index.path`, désactivé par défaut) | ancien tableau de bord en un fichier |
+| `<env>/.moodle-bridge/textes/<CODE>.md` (`texts.dir`) | textes de chaque cours |
 | cache du système (`~/Library/Caches/moodle-bridge`, `%LOCALAPPDATA%\moodle-bridge\Cache`, `~/.cache/moodle-bridge`) | téléchargements en cours |
 | journaux des tâches planifiées (`~/Library/Logs/moodle-bridge`, `%LOCALAPPDATA%\moodle-bridge\logs`, `~/.local/share/moodle-bridge/logs`) | sortie de chaque passage planifié |
 
@@ -25,7 +26,7 @@ Le pont est **en lecture seule côté Moodle** : il ne rend aucun devoir, ne pos
 1. il télécharge dans le cache, hors de l'espace de travail ;
 2. il range les fichiers ;
 3. il met à jour l'état ;
-4. il régénère l'index et les textes.
+4. il régénère le coffre Obsidian et les textes.
 
 `--dry-run` fait tout sauf écrire dans l'espace de travail. Il enregistre ses décisions dans `plan.json`, que le passage réel suivant reprend tel quel : mêmes fichiers, aucun nouvel appel au modèle.
 
@@ -67,41 +68,56 @@ Garanties :
 - consignes des devoirs ;
 - texte des annonces.
 
-Il les nettoie du HTML (Markdown lisible, liens sans jeton) et les conserve dans `state.json` (`remote.texts`), dans un fichier par cours (`texts.dir`) et, pour les modalités de contrôle, dans l'index.
+Il les nettoie du HTML (Markdown lisible, liens sans jeton) et les conserve dans `state.json` (`remote.texts`), dans un fichier par cours (`texts.dir`) et, pour les modalités de contrôle, dans le coffre.
 
 - **Dates** : une annonce garde sa date de publication et de modification. Une page ou un devoir garde la date de modification donnée par Moodle. Moodle ne date pas les résumés de sections ni les étiquettes : le pont note quand il les a relevés (`seen_at`) et quand il y a constaté un changement (`changed_at`). Le premier relevé d'un cours ne compte jamais comme une modification.
 - **Modalités de contrôle (MCC)** : un texte est reconnu comme MCC si :
   - son titre ou sa section correspond à `texts.mcc_title` ;
   - ou son contenu correspond à `texts.mcc_content`.
 
-  Il est recopié en entier dans la section « Modalités de contrôle » de l'index, et sa modification déclenche une notification. Moodle fait foi : pour une question de coefficients, partir de ces textes et dater la réponse.
+  Il est recopié en entier dans la note « Modalités de contrôle » du coffre et dans celle de la matière, et sa modification déclenche une notification. Moodle fait foi : pour une question de coefficients, partir de ces textes et dater la réponse.
 - **Coût** : nul, aucun modèle n'est appelé. `texts.enabled: false` désactive le relevé.
 
 ## Résumés des annonces
 
-Si un modèle est configuré, chaque annonce longue est résumée en quelques lignes, une seule fois, et de nouveau seulement si son texte change. Le résumé s'affiche sous l'annonce dans l'index. Une annonce courte est montrée telle quelle, sans modèle. Réglages : `summaries` (`enabled: false` pour s'en passer). Un moteur, une commande ou un modèle laissés vides reprennent ceux de `classify`.
+Si un modèle est configuré, chaque annonce longue est résumée en quelques lignes, une seule fois, et de nouveau seulement si son texte change. Le résumé s'affiche sous l'annonce dans le coffre. Le coffre n'appelle jamais le modèle : il montre seulement les résumés déjà faits. Une annonce courte est montrée telle quelle, sans modèle. Réglages : `summaries` (`enabled: false` pour s'en passer). Un moteur, une commande ou un modèle laissés vides reprennent ceux de `classify`.
 
-## Index
+## Coffre Obsidian
 
-L'index (`index.path`) est **réécrit à chaque appel** : `sync`, réussi ou non, `status`, `courses`, `index`. Ne jamais le modifier à la main. Il contient, dans cet ordre :
-- les échéances à venir et les annonces récentes, avec leur résumé ;
-- les nouveaux fichiers et les textes modifiés sur Moodle ;
-- les fichiers à classer et ceux à importer dans Zotero ;
-- les modalités de contrôle ;
-- chaque cours, section par section, avec des liens vers les fichiers locaux, les textes du cours et Moodle.
+Le coffre (`vault.dir`, relatif à `<env>`) est **réécrit à chaque appel** : `sync`, réussi ou non, `status`, `courses`, `index`. Il est entièrement déterministe : aucun modèle n'intervient, et une note n'est réécrite que si son contenu change.
 
-Les liens vers les fichiers sont relatifs quand ils sont sous le dossier de l'index, ce qui convient à Obsidian et VS Code. Sinon, ce sont des liens `file://`.
+| Note | Contenu |
+|---|---|
+| `Accueil` | la semaine à venir, les dernières annonces, les nouveaux documents, ce qui attend une action, un tableau des matières |
+| `Matières/<CODE>` | une note par matière : échéances, annonces, modalités de contrôle, notes, puis tout le contenu section par section |
+| `Devoirs/<CODE> — <devoir>` | date limite, fermeture du dépôt, consignes, pièces jointes |
+| `Échéances`, `Annonces`, `Documents`, `Modalités de contrôle` | les mêmes informations, tous cours confondus |
+
+Une route dont le dossier sort de celui du cours (une matière hébergée dans le même cours Moodle) a sa propre note de matière.
+
+**Notes personnelles** : le pont ne modifie et ne supprime que les notes qui portent la propriété `genere_par: moodle-bridge`. L'utilisateur peut écrire ses propres notes dans le coffre ; un agent ne modifie jamais une note générée à la main.
+
+**Liens** : les notes se relient par des liens Obsidian. Les fichiers de cours situés dans le coffre (le dossier qui contient `.obsidian`, ou l'un de ses parents) ont des liens relatifs ; les autres, des liens `file://`.
+
+`index.path` réactive l'ancien tableau de bord en un seul fichier, en plus du coffre ou à sa place (`vault.dir: null`).
 
 ## IA
 
 | `classify.engine` | Commande | Modèle par défaut |
 |---|---|---|
 | `none` | — | — |
-| `claude-cli` | `claude -p` (Claude Code, abonnement Claude) | `claude-haiku-5-5` |
-| `codex-cli` | `codex exec` (Codex, compte ChatGPT ou clé OpenAI) | celui de Codex ; indiquer un petit modèle disponible pour le compte |
+| `claude-cli` | `claude -p` (Claude Code, abonnement Claude) | `haiku` (alias : `haiku`, `sonnet`, `opus`) |
+| `codex-cli` | `codex exec` (Codex, compte ChatGPT ou clé OpenAI) | celui de Codex ; `ai status --json` liste les modèles du compte |
 | `command` | toute commande lisant l'entrée standard, par exemple `["ollama", "run", "{model}"]` | `model` |
 
 `classify.command` donne le chemin de la commande. Mieux vaut un chemin absolu : la tâche planifiée n'a pas le `PATH` du terminal. Si la commande échoue, parce qu'elle est déconnectée ou à court de quota, les fichiers ambigus vont dans la boîte d'attente : rien n'est perdu. Le journal indique le modèle réellement utilisé.
+
+**Changer d'IA ou de modèle** : la commande `ai` le fait sans éditer le JSON.
+- `ai status [--json]` : moteur et modèle actuels, moteurs installés et connectés, modèles proposés ;
+- `ai set --engine claude-cli|codex-cli|command|none [--model M] [--command C]` : écrit `classify.engine`, `classify.model` et le chemin absolu de la commande. Les réglages propres aux résumés (`summaries`) sont remis à vide pour suivre ce choix ;
+- `ai login` : connexion de Claude Code ou de Codex, **dans le terminal de l'utilisateur** (elle passe par le navigateur) ;
+- `ai test` : un court essai réel, avec le modèle effectivement utilisé ;
+- `ai` seul : menu interactif pour l'utilisateur, aussi accessible par un double-clic sur `Choisir-IA.command` (macOS) ou `Choisir-IA.bat` (Windows).
 
 Ce qui est envoyé au modèle :
 - les noms des fichiers et des sections ;
@@ -157,8 +173,9 @@ Toute clé absente prend la valeur par défaut de `scripts/mb/config.py`.
   "summaries": {"enabled": null, "engine": null, "command": null, "model": null, "timeout_s": 120},
   "zotero": {"enabled": false, "token": "@zotero", "staging": ".moodle-bridge/a_importer_zotero", "search_roots": []},
   "overrides": {"1234/5555/fichier.pdf": "TD/TD03"},
-  "index": {"path": "Moodle.md", "title": "Moodle", "news_days": 7, "announcements_per_course": 5},
-  "texts": {"enabled": true, "dir": "Textes Moodle",
+  "vault": {"dir": "Tableau de bord", "title": "Moodle"},
+  "index": {"path": null, "title": "Moodle", "news_days": 7, "announcements_per_course": 5},
+  "texts": {"enabled": true, "dir": ".moodle-bridge/textes",
             "mcc_title": "modalit\\w*\\s+de\\s+contr[ôo]le|\\bMCCC?\\b",
             "mcc_content": "formule\\s+de\\s+calcul|calcul\\s+de\\s+la\\s+note"},
   "schedule": {"interval_minutes": 120},
@@ -173,7 +190,8 @@ Toute clé absente prend la valeur par défaut de `scripts/mb/config.py`.
 - `status` : dernier succès, retard, dernier échec, compteurs, état de la tâche planifiée. `status --check-token` vérifie aussi le jeton.
 - **« jeton refusé »** : relancer `token`, par l'utilisateur.
 - **« claude indisponible » / « Not logged in »** : la commande d'IA doit être connectée une fois par l'utilisateur, avec `claude auth login` ou `codex login`. En attendant, la boîte d'attente prend le relais.
-- **Modèle Codex refusé** (« not supported ») : indiquer un modèle disponible pour le compte dans `classify.model`.
+- **Modèle Codex refusé** (« not supported ») : choisir un modèle proposé par `ai status --json`, puis `ai set`.
+- **« Unable to find a vault »** dans Obsidian : le dossier qui contient `.obsidian` n'a pas encore été ouvert comme coffre (« Ouvrir un dossier comme coffre »).
 - **macOS, `Operation not permitted`** dans le journal de la tâche : macOS refuse à Python l'accès au dossier, souvent dans iCloud, OneDrive ou Documents. L'utilisateur l'autorise dans *Réglages Système → Confidentialité et sécurité*, ou choisit un autre dossier.
 - **Windows**, la tâche ne tourne pas : *Planificateur de tâches → MoodleBridge*, colonne « Résultat de la dernière exécution » ; ou `schedule status`.
 - **Linux** : `crontab -l` doit contenir les lignes `# moodle-bridge:…`.

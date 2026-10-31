@@ -1,6 +1,6 @@
 interface:
   display_name: "Moodle Bridge"
-  short_description: "Synchroniser documents, devoirs, échéances et annonces Moodle en lecture seule, avec un index Markdown"
+  short_description: "Synchroniser documents, devoirs, échéances et annonces Moodle en lecture seule, avec un coffre Obsidian"
   default_prompt: "Utilise $moodle-bridge pour vérifier l'état de la synchronisation Moodle, la lancer si elle est en retard et me résumer les nouveautés."
 
 policy:

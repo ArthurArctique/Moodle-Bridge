@@ -44,14 +44,27 @@ Le moteur d'IA lui-même est décrit dans [ia.md](ia.md).
 | `exclude.max_size_mb` | `200` | fichiers plus lourds seulement listés |
 | `exclude.modnames` | pages, livres, leçons, SCORM… | activités web ignorées comme fichiers ; le texte des pages est quand même conservé |
 
-## Le tableau de bord et les textes
+## Le coffre Obsidian
 
 | Clé | Défaut | Rôle |
 |---|---|---|
-| `index.path` | `Moodle.md` | emplacement du tableau de bord (`null` : aucun) |
-| `index.news_days` | `7` | durée d'affichage d'un nouveau fichier dans « Nouveautés » |
+| `vault.dir` | `Tableau de bord` | dossier des notes générées, relatif au dossier des cours (`null` : aucun coffre) |
+| `vault.title` | `Moodle` | titre de la note d'accueil |
+| `index.news_days` | `7` | durée d'affichage d'un nouveau fichier et d'une annonce dans l'accueil |
 | `index.announcements_per_course` | `5` | annonces récentes relevées par cours |
-| `texts.dir` | `Textes Moodle` | un fichier Markdown par cours avec ses textes |
+
+Le coffre contient `Accueil`, une note par matière (`Matières/`), une par devoir (`Devoirs/`), puis `Échéances`, `Annonces`, `Documents`, `Modalités de contrôle` et `Notes`. Il est écrit sans IA : voir [Lire tes données](../README.md#lire-tes-données--le-coffre-obsidian).
+
+- **Une matière** correspond à un cours suivi, avec son `code`. Une route (`routes`) qui envoie des sections hors du dossier du cours devient une matière à part : par exemple les séances d'insertion professionnelle hébergées dans le cours Moodle d'un autre module. Une route vers un sous-dossier du cours reste dans la même matière.
+- **Les liens vers les fichiers** sont relatifs quand le fichier est dans le coffre Obsidian (le dossier, ou son premier parent, qui contient `.obsidian`) : Obsidian les ouvre lui-même. Sinon, ce sont des liens `file://`.
+- `vault.dir` peut être hors du dossier des cours (chemin absolu, ou `../Mon coffre/Moodle`) : par exemple un coffre Obsidian réservé à Moodle, à côté de tes cours.
+
+### L'ancien index et les textes
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `index.path` | `null` | ancien tableau de bord en un seul fichier (`Moodle.md`), conservé pour les installations antérieures au coffre |
+| `texts.dir` | `.moodle-bridge/textes` | un fichier Markdown par cours avec ses textes bruts ; le coffre les reprend déjà dans les notes des matières |
 | `texts.mcc_title`, `texts.mcc_content` | motifs français | repérage des modalités de contrôle, à adapter pour un Moodle dans une autre langue |
 | `texts.enabled` | `true` | `false` : ne conserver aucun texte |
 

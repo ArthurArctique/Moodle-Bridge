@@ -1,9 +1,46 @@
 # IA (facultative)
 
-Moodle Bridge fonctionne très bien sans IA. Si tu en branches une, elle sert à **deux choses seulement** :
+Moodle Bridge fonctionne très bien sans IA : la synchronisation et le coffre Obsidian n'en ont jamais besoin. Si tu en branches une, elle sert à **deux choses seulement** :
 
 1. **Ranger les fichiers ambigus** des cours en mode `classify`. Moodle range souvent « TP du 1er octobre » ou « Supports 2026 » là où tu voudrais `TD/TD03` ou `CM/CM02`. Les règles sûres passent d'abord : fichier déjà présent, voisins déjà rangés, corrections. L'IA ne tranche que ce qui reste, et sa réponse est vérifiée : dossier autorisé, sous le cours, confiance suffisante. Sinon, le fichier va dans `_a_classer/`.
-2. **Résumer les annonces longues** en quelques lignes, dans le tableau de bord.
+2. **Résumer les annonces longues** en quelques lignes, dans le coffre Obsidian.
+
+## Changer de modèle
+
+Pas besoin d'éditer de fichier. Deux façons, au choix :
+
+### Avec le lanceur, sous macOS ou Windows
+
+Double-clique sur **`Choisir-IA.command`** (macOS) ou **`Choisir-IA.bat`** (Windows), à la racine du dossier de Moodle Bridge. Une fenêtre de terminal :
+1. montre le réglage actuel et les IA installées, connectées ou non ;
+2. propose de se connecter si besoin ;
+3. liste les modèles disponibles ;
+4. enregistre ton choix et propose un essai.
+
+Sous macOS, si le Finder refuse d'ouvrir le fichier la première fois : clic droit → *Ouvrir*.
+
+### Dans un terminal
+
+```bash
+python3 scripts/moodle_bridge.py ai                                     # questions pas à pas
+python3 scripts/moodle_bridge.py ai status                              # IA utilisée, installées, connectées
+python3 scripts/moodle_bridge.py ai set --engine claude-cli --model sonnet
+python3 scripts/moodle_bridge.py ai set --engine codex-cli              # modèle par défaut de Codex
+python3 scripts/moodle_bridge.py ai set --engine none                   # plus d'IA
+python3 scripts/moodle_bridge.py ai login --engine codex-cli            # se connecter
+python3 scripts/moodle_bridge.py ai test                                # essai
+```
+
+Sous Windows, remplace `python3` par `py`. `--config <dossier des cours>/.moodle-bridge/config.json` n'est nécessaire que si tu as plusieurs installations.
+
+Le choix vaut pour le rangement et les résumés. Un réglage particulier des résumés (`summaries`) est retiré à cette occasion, pour qu'ils suivent ton choix.
+
+### Installer Claude Code ou Codex
+
+- **Claude Code** : voir https://docs.claude.com/claude-code. Sous macOS et Linux : `curl -fsSL https://claude.ai/install.sh | bash`. Connexion : `claude auth login`.
+- **Codex** : voir https://github.com/openai/codex, par exemple `npm install -g @openai/codex`. Connexion : `codex login`.
+
+Puis reviens au choix de l'IA : la nouvelle commande y apparaît.
 
 ## Aucune clé d'API
 
@@ -11,12 +48,12 @@ Moodle Bridge appelle une **ligne de commande** déjà installée et connectée 
 
 | `classify.engine` | Commande | Compte utilisé | Modèle par défaut |
 |---|---|---|---|
-| `claude-cli` | [Claude Code](https://docs.claude.com/claude-code) (`claude`) | abonnement Claude | `claude-haiku-5-5` |
+| `claude-cli` | [Claude Code](https://docs.claude.com/claude-code) (`claude`) | abonnement Claude | `haiku` (le dernier Haiku) |
 | `codex-cli` | [Codex](https://github.com/openai/codex) (`codex`) | compte ChatGPT ou clé OpenAI déjà configurée | celui de Codex : indique un petit modèle disponible pour ton compte dans `classify.model` |
 | `command` | n'importe quelle commande qui lit la demande sur son entrée standard et répond sur sa sortie | — | `classify.model`, remplacé dans `{model}` |
 | `none` | — | — | — |
 
-Exemples de réglages :
+Le plus simple est de passer par [Changer de modèle](#changer-de-modèle). Exemples de réglages à la main :
 
 ```json
 "classify": {"engine": "claude-cli", "command": "/Users/moi/.local/bin/claude"}

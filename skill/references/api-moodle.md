@@ -14,7 +14,7 @@ Le pont n'utilise que des fonctions **en lecture** du service web de l'appli mob
 
 Les textes arrivent en HTML ; leurs images et pièces jointes pointent vers `…/webservice/pluginfile.php/…` (parfois avec `?token=`). Le pont les convertit en Markdown et retire le jeton de toute URL avant d'écrire quoi que ce soit.
 
-Téléchargement : `POST` sur l'URL `…/webservice/pluginfile.php/…` fournie par l'API, avec `token` dans le corps. Pour l'index, ces URL sont converties en `…/pluginfile.php/…`, ouvrables dans un navigateur déjà connecté.
+Téléchargement : `POST` sur l'URL `…/webservice/pluginfile.php/…` fournie par l'API, avec `token` dans le corps. Pour le coffre, ces URL sont converties en `…/pluginfile.php/…`, ouvrables dans un navigateur déjà connecté.
 
 Configuration publique, sans identifiant : `POST <site>/lib/ajax/service-nologin.php?info=tool_mobile_get_public_config` avec `[{"index":0,"methodname":"tool_mobile_get_public_config","args":{}}]` (commande `check-site`).
 
@@ -37,7 +37,7 @@ La clé RSS de la page « Clés de sécurité » a le même format (32 caractèr
 | `invalidtoken` | jeton inconnu (mauvaise clé, réinitialisée, révoquée) | nouveau jeton (`token`) |
 | `invalidtimedtoken` | jeton expiré | nouveau jeton |
 | `invalidiptoken` | jeton restreint à une autre adresse IP | nouveau jeton depuis ce réseau |
-| `accessexception` / `nopermissions` | fonction non autorisée pour ce compte | la fonction est ignorée (devoirs, pages, calendrier ou annonces manquants dans l'index) ; les textes déjà conservés pour ce type sont gardés |
+| `accessexception` / `nopermissions` | fonction non autorisée pour ce compte | la fonction est ignorée (devoirs, pages, calendrier ou annonces manquants dans le coffre) ; les textes déjà conservés pour ce type sont gardés |
 | `sizemismatch` | taille reçue différente de celle annoncée | nouvel essai au passage suivant |
 | `CERTIFICATE_VERIFY_FAILED` | Python sans certificats racines | macOS : lancer « Install Certificates.command » du dossier Python des Applications (le client essaie aussi `/etc/ssl/cert.pem`) ; Windows et Linux : certificats du système |
 
@@ -46,7 +46,7 @@ Les erreurs réseau et 5xx sont réessayées trois fois (10 s, 30 s, 90 s) : au 
 ## Limites connues
 
 - Liens externes (Google Drive, sites d'enseignants), activités « URL » : non récupérés.
-- Pièces jointes des annonces : signalées par 📎 dans l'index, non téléchargées.
+- Pièces jointes des annonces : signalées par 📎 dans le coffre, non téléchargées.
 - Pages : texte conservé (voir « Textes et modalités de contrôle » dans `fonctionnement.md`), jamais téléchargées comme fichiers. Livres, leçons, SCORM, H5P : ignorés (contenu web, pas des documents).
 - Résumés de sections et étiquettes : Moodle ne fournit pas leur date de modification ; le pont date ce qu'il constate.
 - Annonces : seules les dernières de chaque cours (`index.announcements_per_course`) sont interrogées ; les plus anciennes déjà relevées restent dans l'état.

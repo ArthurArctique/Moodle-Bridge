@@ -32,23 +32,31 @@ def course_code(cfg, courseid, fallback):
     return conf.get("code") if conf else fallback
 
 
-def upcoming(cfg, remote, now):
-    """Échéances à venir : événements du calendrier, puis dates limites de devoirs absentes du calendrier."""
+def upcoming(cfg, remote, now, limit=MAX_UPCOMING):
+    """Échéances à venir : événements du calendrier, puis dates limites de devoirs absentes du calendrier.
+
+    Un événement lié à un devoir (même adresse) reprend sa section et son numéro d'activité (`cmid`).
+    """
     rows = []
     seen = set()
+    assigns = {a.get("url"): a for a in remote.get("assignments", []) if a.get("url")}
     for event in remote.get("events", []):
         if event.get("timestart", 0) < now - 3600:
             continue
         seen.add((event.get("courseid"), event.get("timestart")))
+        assign = assigns.get(event.get("url")) or {}
         rows.append({"at": event["timestart"], "name": event.get("name") or "", "url": event.get("url"),
-                     "code": course_code(cfg, event.get("courseid"), event.get("course") or "")})
+                     "code": course_code(cfg, event.get("courseid"), event.get("course") or ""),
+                     "courseid": event.get("courseid"), "section": assign.get("section"), "cmid": assign.get("cmid")})
     for assign in remote.get("assignments", []):
         due = assign.get("duedate") or 0
         if due < now or (assign["courseid"], due) in seen:
             continue
         rows.append({"at": due, "name": f"{assign['name']} (date limite)", "url": assign.get("url"),
-                     "code": course_code(cfg, assign["courseid"], assign["course"])})
-    return sorted(rows, key=lambda r: (r["at"], r["code"] or "", r["name"]))[:MAX_UPCOMING]
+                     "code": course_code(cfg, assign["courseid"], assign["course"]),
+                     "courseid": assign["courseid"], "section": assign.get("section"), "cmid": assign.get("cmid")})
+    rows.sort(key=lambda r: (r["at"], r["code"] or "", r["name"]))
+    return rows[:limit] if limit else rows
 
 
 def _upcoming(cfg, remote, now):
