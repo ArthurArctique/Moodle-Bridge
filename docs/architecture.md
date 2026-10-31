@@ -23,14 +23,15 @@ Comment Moodle Bridge fonctionne de l'intérieur. Ce document s'adresse aux pers
 | `classify.py` | règles de rangement : miroir, voisins, validation d'une destination, et dans les éditions avec IA, la demande au modèle |
 | `texts.py` | textes Moodle : HTML → Markdown, empreintes, détection des changements et des modalités de contrôle, un fichier par cours |
 | `summaries.py` | résumés d'annonces ; sans modèle, garde le texte d'une annonce courte ou son début |
-| `index.py` | tableau de bord Markdown : échéances, annonces, nouveautés, à classer, modalités de contrôle, puis chaque cours |
+| `vault.py` | coffre Obsidian : accueil, une note par matière (`Matières/`), une par devoir (`Devoirs/`), échéances, annonces, documents, modalités de contrôle ; liens Obsidian, propriétés, aucune réécriture d'une note inchangée, aucune suppression d'une note non générée |
+| `index.py` | ancien tableau de bord en un seul fichier (facultatif) et fonctions partagées avec le coffre : échéances à venir, annonces récentes |
 | `config.py` | lecture de `config.json`, valeurs par défaut, chemins dérivés, routes de sections |
 | `schedule.py` | tâche planifiée : launchd (macOS), Planificateur de tâches (Windows), cron (Linux) |
 | `system.py` | tout ce qui dépend du système : dossiers de cache, de données et de journaux, notifications, presse-papiers, processus, détection d'Obsidian |
 | `util.py` | écriture atomique, SHA-256, noms de fichiers portables, dates, journal avec rotation |
 | `wizard.py` | assistant d'installation (`install.py`, `init`), interactif ou piloté par un fichier de réponses |
 
-`mb/__init__.py` déclare l'édition (`EDITION`) et ses parties (`FEATURES`). Les modules facultatifs des autres branches (`llm`, `notes`, `snapshot`, `menubar`, `skillgen`) sont importés s'ils existent. Leur absence est prévue partout : le pont se contente alors de ne pas proposer la fonction.
+`mb/__init__.py` déclare l'édition (`EDITION`) et ses parties (`FEATURES`). Les modules facultatifs des autres branches (`llm`, `ai`, `notes`, `snapshot`, `menubar`, `skillgen`) sont importés s'ils existent. Leur absence est prévue partout : le pont se contente alors de ne pas proposer la fonction.
 
 ## Fichiers
 
@@ -44,9 +45,12 @@ Dans le dossier des cours (l'« environnement ») :
 │   ├── plan.json        décisions d'une simulation (sync --dry-run), réutilisées par le passage réel
 │   ├── sync.lock        verrou d'un passage en cours (abandonné après 1 h ou si le processus a disparu)
 │   ├── logs/sync.log    journal (rotation à 1 Mo)
-│   └── .gitignore       « * » : rien de ce dossier ne part dans un dépôt git
-├── Moodle.md            tableau de bord (index.path)
-├── Textes Moodle/       un fichier Markdown par cours (texts.dir)
+│   ├── .gitignore       « * » : rien de ce dossier ne part dans un dépôt git
+│   └── textes/          un fichier Markdown par cours (texts.dir)
+├── .obsidian/           créé par l'assistant si Obsidian est installé : le dossier s'ouvre comme coffre
+├── Tableau de bord/     coffre généré (vault.dir) : Accueil, Échéances, Annonces, Documents,
+│   ├── Matières/        Modalités de contrôle, une note par matière
+│   └── Devoirs/         et une par devoir
 └── <un dossier par cours>/
     └── _a_classer/      fichiers que le pont n'a pas su ranger
 ```
@@ -76,7 +80,7 @@ flowchart TD
     D --> C[décisions de rangement]
     C --> P[copie sans écrasement]
     P --> S[state.json]
-    S --> I[index + fichiers de textes]
+    S --> I[coffre Obsidian + fichiers de textes]
     I --> N[notification]
 ```
 
@@ -87,11 +91,11 @@ flowchart TD
 5. **Téléchargement** des fichiers nouveaux, ou modifiés (date ou taille différente), dans le cache. Le fichier passe d'abord par un `.part`, puis sa taille est contrôlée.
 6. **Décisions** de rangement : voir ci-dessous.
 7. **Copie** (`sync.place`) : écriture dans `.<nom>.moodle-part` à côté de la cible, puis renommage. Si un fichier différent porte déjà ce nom, la nouvelle version devient `nom (Moodle AAAA-MM-JJ).ext`.
-8. **État, index, textes** : `state.json` est écrit de façon atomique, puis l'index et les fichiers de textes sont régénérés, ces derniers seulement s'ils changent.
+8. **État, coffre, textes** : `state.json` est écrit de façon atomique, puis le coffre et les fichiers de textes sont régénérés. Une note ou un fichier n'est réécrit que si son contenu change ; une note générée devenue sans objet (devoir retiré, matière plus suivie) est supprimée si elle porte `genere_par: moodle-bridge`.
 
 `sync --dry-run` fait tout sauf écrire dans l'environnement et enregistre ses décisions dans `plan.json`. Le passage réel suivant les reprend telles quelles.
 
-En cas d'échec (jeton refusé, réseau, erreur imprévue), `record_failure` note l'erreur et son type dans l'état. L'index est quand même régénéré pour l'afficher.
+En cas d'échec (jeton refusé, réseau, erreur imprévue), `record_failure` note l'erreur et son type dans l'état. Le coffre est quand même régénéré pour l'afficher sur l'accueil.
 
 ## Règles de rangement
 
@@ -168,7 +172,7 @@ La tâche lance `moodle_bridge.py sync --config … --quiet --scheduled`. `sched
 
 ## Réglages
 
-Toute clé absente prend la valeur par défaut de `scripts/mb/config.py`. L'assistant écrit `index.path` (`Moodle.md`) et `texts.dir` (`Textes Moodle`).
+Toute clé absente prend la valeur par défaut de `scripts/mb/config.py`. L'assistant écrit `vault.dir` (`Tableau de bord`, ou `null` si l'utilisateur répond « aucun ») et `texts.dir` (`.moodle-bridge/textes`).
 
 | Clé | Défaut | Rôle |
 |---|---|---|
@@ -188,8 +192,10 @@ Toute clé absente prend la valeur par défaut de `scripts/mb/config.py`. L'assi
 | `texts.enabled` | `true` | relever les textes |
 | `texts.dir` | `.moodle-bridge/textes` | un fichier Markdown par cours (`null` : aucun) |
 | `texts.mcc_title`, `texts.mcc_content` | motifs français | repérage des modalités de contrôle |
-| `index.path` | `null` | tableau de bord (`null` : aucun) |
-| `index.news_days` | `7` | durée d'affichage dans « Nouveautés » |
+| `vault.dir` | `null` (`Tableau de bord` par l'assistant) | dossier du coffre généré ; relatif au dossier des cours, ou absolu |
+| `vault.title` | `Moodle` | titre de l'accueil |
+| `index.path` | `null` | ancien tableau de bord en un seul fichier (`null` : aucun) |
+| `index.news_days` | `7` | durée d'affichage des nouveautés (accueil du coffre et ancien tableau de bord) |
 | `index.announcements_per_course` | `5` | annonces relevées par cours |
 | `schedule.interval_minutes` | `120` | intervalle de la tâche planifiée (15 minimum) |
 | `notify` | `true` | notifications du système |
@@ -207,6 +213,7 @@ python3 -I -m unittest discover -s tests
 - les fichiers déplacés, supprimés ou retirés ;
 - les voisins, les routes, Zotero ;
 - les textes et les MCC ;
+- le coffre Obsidian : liens, routes, notes personnelles préservées ;
 - l'index, la simulation et le verrou.
 
-`tests/test_platform.py` couvre les noms portables, les tâches Windows et cron, le coffre et l'assistant en mode non interactif. Aucun test n'accède au réseau.
+`tests/test_platform.py` couvre les noms portables, les tâches Windows et cron, le coffre du système (jeton) et l'assistant en mode non interactif. Aucun test n'accède au réseau.

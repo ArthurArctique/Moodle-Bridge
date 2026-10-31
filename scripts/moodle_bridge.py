@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from mb import (api, classify, config, credentials, index, schedule, summaries,  # noqa: E402
-                sync, system, texts, util, wizard)
+                sync, system, texts, util, vault, wizard)
 
 
 def _optional(name):
@@ -37,10 +37,11 @@ def _optional(name):
         return None
 
 
-menubar, notes, skillgen, snapshot = (_optional(n) for n in ("menubar", "notes", "skillgen", "snapshot"))
+ai, menubar, notes, skillgen, snapshot = (_optional(n) for n in ("ai", "menubar", "notes", "skillgen", "snapshot"))
 
 # Exemples de l'aide pour les parties présentes dans cette édition
 EXTRA_EXAMPLES = [line for module, line in (
+    (ai, "  moodle_bridge.py ai                 (choisir l'IA et son modèle, pas à pas)\n"),
     (skillgen, "  moodle_bridge.py skill install --config … --target claude|codex|both\n"),
     (notes, "  moodle_bridge.py notes status --config …\n"),
     (menubar, "  moodle_bridge.py menubar install --config …\n")) if module]
@@ -249,12 +250,19 @@ def notify_report(cfg, report):
 
 
 def publish(cfg):
-    """Index, textes des cours et état de la barre des menus : à jour à chaque appel, pour refléter l'état réel."""
+    """Coffre, index, textes des cours et état de la barre des menus : à jour à chaque appel, pour refléter
+    l'état réel."""
     state = sync.load_state(cfg.state_path)
+    vault.write(cfg, state)
     index.write(cfg, state)
     texts.write_files(cfg, state)
     if snapshot:
         snapshot.write(cfg, state)
+    if ai:
+        try:
+            ai.remember(cfg)  # pour que les lanceurs Choisir-IA trouvent l'installation
+        except OSError:
+            pass
 
 
 def describe_http_error(exc):
@@ -309,6 +317,8 @@ def cmd_sync(args):
     if report["classifier_error"]:
         log(f"  ! classement automatique : {report['classifier_error']}")
     log(f"Terminé : {summary_line(report)}.")
+    if cfg.vault_dir:
+        log(f"Coffre Obsidian : {cfg.vault_dir}")
     if cfg.index_path:
         log(f"Index : {cfg.index_path}")
     if can_notify:
@@ -379,6 +389,11 @@ def cmd_notes(args):
         log(f"  ! mystère : {report['model_error']}")
     log(f"Terminé : {report['tracked']} élément(s) de note suivis dans {report['checked']} cours, "
         f"{len(report['new'])} nouvelle(s) note(s), {len(report['revealed'])} découverte(s).")
+    # La page Notes du coffre suit le relevé, sans attendre la prochaine synchronisation des documents
+    try:
+        vault.write(cfg, sync.load_state(cfg.state_path))
+    except OSError as exc:
+        log(f"  ! coffre non mis à jour : {exc}")
     return 0
 
 
@@ -454,7 +469,12 @@ def notes_schedule(cfg, args):
 def cmd_index(args):
     cfg = load_config(args)
     publish(cfg)
-    print(f"Index régénéré : {cfg.index_path}" if cfg.index_path else "Aucun index configuré.")
+    if cfg.vault_dir:
+        print(f"Coffre Obsidian régénéré : {cfg.vault_dir}")
+    if cfg.index_path:
+        print(f"Index régénéré : {cfg.index_path}")
+    if not cfg.vault_dir and not cfg.index_path:
+        print("Ni coffre ni index configuré (« vault.dir », « index.path »).")
     return 0
 
 
@@ -530,6 +550,7 @@ def cmd_status(args):
         "late": late, "interval_minutes": cfg.interval_minutes, "last_error": state.get("last_error"),
         "counts": dict(counts), "inbox": [e.get("local_path") for e in inbox],
         "plan_pending": cfg.plan_path.exists(), "schedule": schedule.status(cfg),
+        "vault": str(cfg.vault_dir) if cfg.vault_dir else None,
         "index": str(cfg.index_path) if cfg.index_path else None,
         "texts": len(state_texts), "texts_dir": str(cfg.texts_dir) if cfg.texts_dir else None,
         "mcc_texts": sum(1 for t in state_texts.values() if texts.is_mcc(t, cfg.data["texts"])),
@@ -624,6 +645,58 @@ def cmd_skill(args):
     return status
 
 
+def cmd_ai(args):
+    """IA du pont : état, choix du moteur et du modèle, connexion, essai."""
+    try:
+        path = Path(args.config) if args.config else (ai.choose_config() if args.action == "choose" else None)
+        if path is None:
+            found = ai.known_configs()
+            if len(found) != 1:
+                sys.exit("Indiquer l'installation : --config <dossier des cours>/.moodle-bridge/config.json")
+            path = found[0]
+        if args.action == "choose":
+            return ai.interactive(path)
+        cfg = config.load(path)
+        if args.action == "status":
+            info = ai.status(cfg)
+            if args.json:
+                print(json.dumps(info, ensure_ascii=False, indent=2))
+                return 0
+            now = info["current"]
+            print(f"IA : {now['label']}" + (f", modèle {now['model']}" if now["model"] else ""))
+            for engine in info["engines"][:2]:
+                state = ("non installé" if not engine["installed"] else
+                         {True: "connecté", False: "non connecté"}.get(engine["logged_in"], "état inconnu"))
+                print(f"  {engine['label']} : {state}" + (f" ({engine['path']})" if engine["path"] else ""))
+            for name, values in info["overrides"].items():
+                print(f"  {name} a son propre réglage : {values}")
+            return 0
+        if args.action == "set":
+            if not args.engine:
+                sys.exit("ai set : indiquer --engine (claude-cli, codex-cli, command ou none)")
+            cleared = ai.apply(cfg.path, args.engine, args.model, args.command)
+            cfg = config.load(cfg.path)
+            result = {"current": ai.current(cfg), "cleared": cleared}
+            if snapshot:
+                snapshot.write(cfg, sync.load_state(cfg.state_path))
+            print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else
+                  f"IA enregistrée : {result['current']['label']}" +
+                  (f", modèle {result['current']['model']}" if result["current"]["model"] else ""))
+            return 0
+        if args.action == "login":
+            engine = args.engine or ai.current(cfg)["engine"]
+            return ai.login(engine, cfg.data["classify"].get("command") if engine == ai.current(cfg)["engine"] else None)
+        result = ai.test(cfg)
+        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else
+              ("✓ " if result["ok"] else "✗ ") + result["message"])
+        return 0 if result["ok"] else 1
+    except (ai.AiError, config.ConfigError) as exc:
+        sys.exit(f"IA : {exc}")
+    except (KeyboardInterrupt, EOFError):
+        print("\nAnnulé : rien n'est changé.")
+        return 1
+
+
 def cmd_uninstall(args):
     """Retire ce que l'installation a ajouté au système ; les fichiers rangés et l'index restent en place."""
     cfg = load_config(args)
@@ -672,7 +745,7 @@ def main(argv=None):
     p.add_argument("--no-classify", action="store_true", help="ne pas appeler le modèle de langage")
     p.add_argument("--quiet", action="store_true")
     p.add_argument("--scheduled", action="store_true", help="lancé par la tâche planifiée")
-    with_config("index", cmd_index, "régénérer l'index (et les textes des cours) à partir de l'état")
+    with_config("index", cmd_index, "régénérer le coffre Obsidian, l'index et les textes des cours à partir de l'état")
     p = with_config("texts", cmd_texts, "afficher les textes Moodle conservés (sections, pages, consignes, annonces)")
     p.add_argument("--course", help="code du cours (nom de son dossier, ex. ABC)")
     p.add_argument("--mcc", action="store_true", help="seulement les modalités de contrôle")
@@ -699,6 +772,16 @@ def main(argv=None):
         p.add_argument("--scheduled", action="store_true", help="lancé par la tâche planifiée")
         p.add_argument("--no-notify", action="store_true", help="ne pas envoyer de notification")
         p.add_argument("--no-mystery", action="store_true", help="ne pas appeler le modèle (mystère par défaut 🎁)")
+    if ai:
+        p = sub.add_parser("ai", help="choisir l'IA (Claude Code, Codex, autre, aucune) et son modèle")
+        p.add_argument("action", nargs="?", default="choose", choices=["choose", "status", "set", "login", "test"],
+                       help="choose (défaut) : questions pas à pas")
+        p.add_argument("--config", help="chemin de .moodle-bridge/config.json (défaut : l'installation connue)")
+        p.add_argument("--engine", choices=["claude-cli", "codex-cli", "command", "none"])
+        p.add_argument("--model", help="modèle (Claude Code : haiku, sonnet, opus ; vide : celui par défaut)")
+        p.add_argument("--command", help="chemin de la commande, ou commande complète pour « command »")
+        p.add_argument("--json", action="store_true")
+        p.set_defaults(func=cmd_ai)
     if skillgen:
         p = with_config("skill", cmd_skill, "installer le skill des agents IA (Claude Code, Codex…)")
         p.add_argument("action", choices=["install", "show"])

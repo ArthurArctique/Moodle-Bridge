@@ -14,7 +14,7 @@ import urllib.error
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import FEATURES, api, config, credentials, system, util
+from . import FEATURES, api, config, credentials, system, util, vault
 
 try:
     from . import llm
@@ -27,6 +27,8 @@ DEFAULT_RULES = (
     "et ce qui ne relève d'aucune séance dans Ressources/."
 )
 DEFAULT_PATTERNS = [r"(CM|TD|TP)/\1\d{2}", "Ressources", "Projet", "Examens"]
+DEFAULT_VAULT = "Tableau de bord"
+NO_VAULT = ("aucun", "none", "non", "-")
 LOGIN_HINTS = {1: "password", 2: "browser", 3: "browser"}
 # Fin d'adresse copiée depuis le navigateur, à retirer pour retrouver la racine du site
 PAGE_SUFFIX = re.compile(r"/(login/index\.php|my/?|my/courses\.php|course/view\.php|index\.php|admin/.*)$")
@@ -137,13 +139,14 @@ def courses_config(courses, mode, existing=None, exclude=()):
     return result
 
 
-def base_config(site, keychain_service, engine, index_path, texts_dir, interval, mode):
+def base_config(site, keychain_service, engine, index_path, texts_dir, interval, mode, vault_dir=None):
     data = {
         "version": 1,
         "site": site,
         "keychain_service": keychain_service,
         "env_root": "..",
         "courses": {},
+        "vault": {"dir": vault_dir, "title": "Moodle"},
         "index": {"path": index_path, "title": "Moodle"},
         "texts": {"dir": texts_dir},
         "schedule": {"interval_minutes": int(interval)},
@@ -241,16 +244,26 @@ def run(answers=None, actions=None, ask=input, ask_secret=getpass.getpass):
                               "existants conservés) ?", True):
             raise Abort("installation existante laissée telle quelle")
 
-    # 3. Lecture des données
-    index_path = previous.get("index", {}).get("path") if previous else None
-    index_path = p.text("index", "Fichier d'index (tableau de bord Markdown)", index_path or "Moodle.md")
-    texts_dir = p.text("texts_dir", "Dossier des textes de Moodle (annonces, consignes, MCC)",
-                       (previous or {}).get("texts", {}).get("dir") or "Textes Moodle")
+    # 3. Coffre Obsidian : notes générées, sans IA, dans un sous-dossier du dossier des cours
+    prev = previous or {}
+    vault_dir = p.text("vault", "Dossier des notes Obsidian générées (accueil, une note par matière, devoirs, "
+                                "annonces…), dans le dossier des cours ; « aucun » pour s'en passer",
+                       (prev.get("vault") or {}).get("dir") or DEFAULT_VAULT)
+    if not vault_dir or str(vault_dir).strip().lower() in NO_VAULT:
+        vault_dir = None
+    # Ancien tableau de bord en un seul fichier et textes des cours (lus par les agents) : sans question
+    given = p.answers or {}
+    index_path = given.get("index", (prev.get("index") or {}).get("path"))
+    texts_dir = given.get("texts_dir") or (prev.get("texts") or {}).get("dir") or ".moodle-bridge/textes"
     if system.obsidian_installed():
-        say(p, "  ✓ Obsidian est installé : ouvre le dossier ci-dessus comme coffre (« Ouvrir un dossier comme "
-               "coffre ») pour naviguer entre l'index, les textes et tes PDF.\n")
+        if vault_dir:
+            # Le dossier des cours devient le coffre : les liens vers les PDF s'ouvrent alors dans Obsidian
+            if vault.find_root(env) == env and not (env / ".obsidian").exists():
+                (env / ".obsidian").mkdir(parents=True, exist_ok=True)
+            say(p, f"  ✓ Obsidian est installé : ouvre {vault.find_root(env)} comme coffre (« Ouvrir un dossier "
+                   f"comme coffre »), puis la note « {vault_dir}/{vault.HOME} ».\n")
     else:
-        say(p, "  ℹ Obsidian n'est pas installé : les fichiers Markdown seront créés quand même. Pour les lire "
+        say(p, "  ℹ Obsidian n'est pas installé : les notes Markdown seront créées quand même. Pour les lire "
                "confortablement, installe Obsidian (https://obsidian.md) ou ouvre le dossier dans VS Code.\n")
 
     # 4. Modèle de langage
@@ -295,7 +308,7 @@ def run(answers=None, actions=None, ask=input, ask_secret=getpass.getpass):
 
     # 6. Configuration et connexion
     service = (previous or {}).get("keychain_service") or token_service(site)
-    data = base_config(site, service, engine, index_path, texts_dir, interval, mode)
+    data = base_config(site, service, engine, index_path, texts_dir, interval, mode, vault_dir)
     if previous:
         data = config.deep_merge(previous, {k: v for k, v in data.items() if k != "courses"})
     write_config(config_path, data)
@@ -373,6 +386,8 @@ def finish(cfg, p, pending=(), actions=None):
     index = cfg.index_path
     say(p, "\n=== Terminé ===")
     say(p, f"Tes cours : {cfg.env_root}")
+    if cfg.vault_dir:
+        say(p, f"Coffre Obsidian : {cfg.vault_dir / (vault.HOME + '.md')}")
     if index:
         say(p, f"Tableau de bord : {index}")
     say(p, f"Réglages : {cfg.path}")

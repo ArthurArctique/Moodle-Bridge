@@ -8,7 +8,7 @@ Moodle Bridge se connecte à ton Moodle comme le fait l'appli mobile officielle 
 - les **annonces** ;
 - les **textes** de Moodle : consignes, pages, présentations des sections, modalités de contrôle.
 
-Il tient à jour un **tableau de bord** en Markdown (`Moodle.md`) : à rendre bientôt, nouveautés, annonces, puis chaque cours section par section, avec un lien vers chaque fichier.
+Il tient à jour un **coffre Obsidian** bien rangé : une page d'accueil, une note par matière, une note par devoir, les annonces et les modalités de contrôle, avec un lien vers chaque fichier. Ces notes sont régénérées à chaque passage.
 
 - **Lecture seule** : rien n'est jamais déposé, posté ni marqué comme lu sur Moodle.
 - **Rien n'est écrasé** : tes annotations dans un PDF restent intactes. Une nouvelle version arrive à côté de l'ancienne.
@@ -22,7 +22,7 @@ Le dépôt a plusieurs branches. Tu es sur **`outil`** :
 |---|---|---|
 | [`main`](../../tree/main) | tout le monde, clé en main | tout : synchronisation, IA facultative, application de barre des menus (macOS), notes, skill pour agents IA |
 | [`cli-ia`](../../tree/cli-ia) | Windows, Linux, ou macOS sans application | synchronisation, IA facultative par ligne de commande, skill pour agents IA |
-| **`outil`** | « juste la connexion » | synchronisation, rangement par section Moodle, tableau de bord Markdown ; aucune IA, aucune interface |
+| [`outil`](../../tree/outil) | « juste la connexion » | synchronisation, rangement par section Moodle, coffre Obsidian ; aucune IA, aucune interface |
 | [`skill`](../../tree/skill) | utilisateurs d'agents IA | le skill seul : ton agent (Claude Code, Codex…) te guide dans l'installation |
 
 ## Prérequis
@@ -48,7 +48,7 @@ L'assistant pose quelques questions. Chacune a une valeur par défaut : Entrée 
 
 1. **L'adresse de ton Moodle** : copie celle de la barre d'adresse, n'importe quelle page de Moodle convient.
 2. **Où ranger tes cours** : `~/Moodle` par défaut, ou un dossier de ton coffre Obsidian s'il en trouve un.
-3. **L'index et les textes** : `Moodle.md` et `Textes Moodle/`, dans ce dossier.
+3. **Le coffre Obsidian** : le sous-dossier `Tableau de bord` de ton dossier de cours (« aucun » pour s'en passer).
 4. **La fréquence** de synchronisation : toutes les 2 h par défaut.
 5. **La connexion à Moodle**, voir juste en dessous.
 6. **Les cours à suivre** : tous par défaut, tu peux en exclure. Chaque cours est rangé par section Moodle.
@@ -92,27 +92,33 @@ Certains Moodle affichent la clé dans *Profil → Préférences → Clés de s�
 
 Guide détaillé et cas particuliers : [docs/premiere-connexion.md](docs/premiere-connexion.md).
 
-Si le jeton expire (`jeton refusé` dans le tableau de bord ou une notification), relance simplement :
+Si le jeton expire (`jeton refusé` dans l'accueil du coffre ou une notification), relance simplement :
 
 ```bash
 python3 scripts/moodle_bridge.py token --config ~/Moodle/.moodle-bridge/config.json
 ```
 
-## Lire tes données : Obsidian, VS Code ou autre
+## Lire tes données : le coffre Obsidian
 
-Tout ce que produit Moodle Bridge est un dossier de fichiers ordinaires :
-- tes documents, rangés par cours ;
-- `Moodle.md`, le tableau de bord ;
-- `Textes Moodle/`, un fichier Markdown par cours.
+Tout ce que produit Moodle Bridge est un dossier de fichiers ordinaires : tes documents, rangés par cours, et un **coffre Obsidian** dans `Tableau de bord/`.
 
-Le **Markdown** est du texte avec une mise en forme légère : titres, listes, tableaux, liens. Il est lisible partout, mais un **lecteur Markdown** le rend vraiment agréable : les titres deviennent des titres, les tableaux des tableaux, et chaque lien ouvre le PDF ou la page Moodle d'un clic. Sans lecteur, tu verras du texte brut avec des `#`, des `|` et des `[liens](…)`.
+| Note | Contenu |
+|---|---|
+| `Accueil` | la semaine à venir, les annonces récentes, les nouveaux documents, ce qui attend une action, le tableau des matières |
+| `Matières/<CODE>` | une note par matière : échéances, annonces, modalités de contrôle, puis tout le contenu section par section (textes, documents, devoirs) |
+| `Devoirs/<CODE> — <devoir>` | date limite, consignes, pièces jointes et lien de dépôt |
+| `Échéances`, `Annonces`, `Documents`, `Modalités de contrôle` | les mêmes informations, tous cours confondus |
 
-**[Obsidian](https://obsidian.md)** (gratuit) est le plus confortable pour naviguer dans ces données. Ouvre ton dossier de cours comme un *coffre* : *Ouvrir un dossier comme coffre*. Tu y gagnes :
-- le tableau de bord en page d'accueil, avec liens cliquables vers chaque PDF et chaque annonce ;
+Ces notes sont **déterministes**. Elles sont régénérées à chaque passage à partir de ce que Moodle renvoie, et réécrites seulement quand leur contenu change. Leurs propriétés (matière, date limite, statut…) servent aux recherches et aux bases d'Obsidian.
+
+**Tes propres notes ne sont jamais touchées**, même posées dans `Tableau de bord/` : le pont ne modifie et ne supprime que les notes qui portent sa propriété `genere_par: moodle-bridge`.
+
+**[Obsidian](https://obsidian.md)** (gratuit) est le plus confortable pour naviguer dans ces données. Ouvre ton dossier de cours comme un *coffre* (*Ouvrir un dossier comme coffre*), puis la note `Tableau de bord/Accueil`. Tu y gagnes :
+- des liens entre accueil, matières et devoirs, et vers chaque PDF et chaque page Moodle ;
 - l'ouverture des PDF dans Obsidian même, pour lire sans changer d'application ;
 - la recherche plein texte dans les consignes, les annonces et les modalités de contrôle de tous les cours ;
 - tes propres notes à côté des cours, avec des liens vers les documents synchronisés ;
-- la mise à jour en direct : le tableau de bord change sous tes yeux après chaque synchronisation.
+- la mise à jour en direct après chaque synchronisation.
 
 **Obsidian n'est pas obligatoire.** Si tu ne l'as pas, les fichiers sont créés exactement pareil. Tu peux les ouvrir avec :
 - **VS Code** : ouvre le dossier, puis `Ctrl+Maj+V` (`Cmd+Maj+V` sur Mac) affiche l'aperçu du Markdown ;
@@ -131,17 +137,16 @@ flowchart LR
         T([Tâche planifiée<br/>toutes les 2 h]) --> P[Moodle Bridge]
         J[[Coffre du système<br/>jeton]] -.-> P
         P --> D[📁 Dossier des cours<br/>un dossier par cours]
-        P --> I[📄 Moodle.md<br/>tableau de bord]
-        P --> X[📄 Textes Moodle<br/>consignes, annonces, MCC]
+        P --> V[📒 Tableau de bord<br/>coffre Obsidian : accueil,<br/>matières, devoirs]
         P --> S[(état .moodle-bridge)]
     end
 
-    D & I & X --> R[Obsidian, VS Code<br/>ou autre lecteur Markdown]
+    D & V --> R[Obsidian, VS Code<br/>ou autre lecteur Markdown]
 ```
 
 1. **La tâche planifiée** lance Moodle Bridge toutes les 2 h. Selon le système, c'est launchd sur macOS, le Planificateur de tâches sur Windows et cron sur Linux. Un passage manqué, ordinateur éteint ou en veille, est rattrapé au réveil.
 2. **Moodle Bridge** demande à Moodle ce qui a changé, avec le jeton rangé dans le coffre du système. Il télécharge les nouveaux documents et les range dans ton dossier, un sous-dossier par section Moodle.
-3. **Le tableau de bord et les textes** sont réécrits à chaque passage. Ne les modifie pas : tes notes vont dans tes propres fichiers.
+3. **Le coffre Obsidian** est régénéré à chaque passage. Ne modifie pas ses notes : les tiennes vont dans tes propres fichiers.
 4. **Tu lis** le tout dans Obsidian, VS Code ou ton explorateur de fichiers.
 
 Le fonctionnement interne est décrit dans [docs/architecture.md](docs/architecture.md) :
@@ -154,7 +159,7 @@ Le fonctionnement interne est décrit dans [docs/architecture.md](docs/architect
 
 ## Au quotidien
 
-Il n'y a rien à faire : la synchronisation tourne toute seule. Ouvre `Moodle.md` pour voir les nouveautés. Pour agir à la main :
+Il n'y a rien à faire : la synchronisation tourne toute seule. Ouvre la note `Accueil` du coffre pour voir les nouveautés. Pour agir à la main :
 
 ```bash
 # remplace ~/Moodle par ton dossier de cours
@@ -170,7 +175,7 @@ python3 scripts/moodle_bridge.py texts   --config ~/Moodle/.moodle-bridge/config
 
 ## Sécurité et vie privée
 
-- Le jeton reste dans le coffre-fort de ton système. Il n'est jamais écrit dans un fichier, ni dans les journaux, ni dans le tableau de bord. Tous les liens sont nettoyés du jeton.
+- Le jeton reste dans le coffre-fort de ton système. Il n'est jamais écrit dans un fichier, ni dans les journaux, ni dans le coffre Obsidian. Tous les liens sont nettoyés du jeton.
 - Le mot de passe, si tu choisis cette méthode, sert une seule fois et n'est jamais stocké.
 - Moodle Bridge ne parle qu'à ton Moodle. Aucune autre connexion, aucune IA dans cette édition.
 - Le dossier `.moodle-bridge/` (réglages, état, journaux) contient ton adresse Moodle et la liste de tes cours. Il est exclu de git par défaut : ne le publie pas.

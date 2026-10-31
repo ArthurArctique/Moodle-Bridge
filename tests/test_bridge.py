@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from mb import api, classify, config, fetch, index, credentials, sync  # noqa: E402
+from mb import api, classify, config, fetch, index, credentials, sync, vault  # noqa: E402
 
 try:
     from mb import snapshot  # noqa: E402
@@ -520,6 +520,120 @@ class TextTests(unittest.TestCase):
         self.assertIsNone(cfg.texts_dir)
         index.write(cfg, state)
         self.assertNotIn("## Modalités de contrôle", (tmp / "Vault/Moodle.md").read_text())
+
+
+class VaultTests(unittest.TestCase):
+    """Coffre Obsidian : notes reliées, régénérées sans modèle de langage."""
+
+    def _sync(self, **extra):
+        tmp, cfg = make_env(vault={"dir": "Vault/Tableau de bord"}, index={"path": None}, **extra)
+        (tmp / "Vault/.obsidian").mkdir(parents=True)
+        client = TextTests._client(TextTests())
+        sync.run(cfg, client, FakeClassifier(json.dumps({"placements": []})), log=quiet)
+        vault.write(cfg, sync.load_state(cfg.state_path))
+        return tmp, cfg, client
+
+    def test_pages_and_links(self):
+        tmp, cfg, _client = self._sync()
+        board = tmp / "Vault/Tableau de bord"
+        names = {p.relative_to(board).as_posix() for p in board.rglob("*.md")}
+        self.assertEqual(names, {"Accueil.md", "Échéances.md", "Annonces.md", "Documents.md",
+                                 "Modalités de contrôle.md", "Matières/TST.md", "Devoirs/TST — Rendu projet.md"})
+        self.assertFalse((tmp / "Vault/Moodle.md").exists())  # l'ancien index est désactivé
+        home = (board / "Accueil.md").read_text()
+        self.assertIn("genere_par: moodle-bridge", home)
+        self.assertIn("[[Tableau de bord/Matières/TST\\|TST]]", home)  # lien dans un tableau : barre échappée
+        self.assertIn("[[Tableau de bord/Devoirs/TST — Rendu projet\\|Rendu projet doit être rendu]]", home)
+        self.assertIn("(demain)", home)
+        self.assertNotIn("Notes", home.split("\n## ")[0])  # pas de page Notes sans relevé des notes
+
+        subject = (board / "Matières/TST.md").read_text()
+        for expected in ('type: "moodle-matiere"', "## Modalités de contrôle",
+                         "(CC1 + 2\\*CC2) / 3", "### TP 1", "Salle changée",
+                         # fichier hors du coffre : lien file://
+                         (tmp / "Cours/TST/_a_classer/sujet.pdf").resolve().as_uri()):
+            self.assertIn(expected, subject)
+        assignment = (board / "Devoirs/TST — Rendu projet.md").read_text()
+        self.assertIn("Rendre un PDF.", assignment)
+        self.assertIn('matiere: "[[Tableau de bord/Matières/TST|TST]]"', assignment)
+        news = (board / "Annonces.md").read_text()
+        self.assertIn("Salle B12.", news)
+        self.assertNotIn("Résumé (IA)", news)  # aucun résumé sans IA
+
+    def test_files_inside_vault_use_relative_links(self):
+        tmp, cfg = make_env(courses={"10": {"dest": "Vault/Cours", "code": "TST", "mode": "mirror"}},
+                            vault={"dir": "Vault/Tableau de bord"})
+        (tmp / "Vault/.obsidian").mkdir(parents=True)
+        client = FakeClient()
+        client.add_file(101, "sujet 1.pdf", b"SUJET", section="TP 1")
+        sync.run(cfg, client, FakeClassifier("{}"), log=quiet)
+        vault.write(cfg, sync.load_state(cfg.state_path))
+        subject = (tmp / "Vault/Tableau de bord/Matières/TST.md").read_text()
+        self.assertIn("(../../Cours/TP%201/sujet%201.pdf)", subject)
+
+    def test_route_outside_course_gets_its_own_subject(self):
+        tmp, cfg = make_env(courses={"10": {"dest": "Cours/TST", "code": "TST", "mode": "mirror", "routes": [
+            {"sections": r"^TD\d+-", "dest": "Cours/XYZ", "code": "XYZ"},
+            {"sections": r"^Bio$", "dest": "Cours/TST/Bio", "code": "TST-Bio"}]}},
+            vault={"dir": "Vault"})
+        client = FakeClient()
+        client.add_file(401, "xyz.pdf", b"X", section="TD1- Présentation")
+        client.add_file(402, "bio.pdf", b"B", section="Bio")
+        sync.run(cfg, client, FakeClassifier("{}"), log=quiet)
+        vault.write(cfg, sync.load_state(cfg.state_path))
+        subjects = sorted(p.name for p in (tmp / "Vault/Matières").glob("*.md"))
+        self.assertEqual(subjects, ["TST.md", "XYZ.md"])
+        xyz = (tmp / "Vault/Matières/XYZ.md").read_text()
+        self.assertIn("xyz.pdf", xyz)
+        self.assertNotIn("bio.pdf", xyz)
+        self.assertIn("bio.pdf", (tmp / "Vault/Matières/TST.md").read_text())
+
+    def test_cleanup_keeps_personal_notes(self):
+        tmp, cfg, client = self._sync()
+        board = tmp / "Vault/Tableau de bord"
+        mine = board / "Devoirs/Mes idées.md"
+        mine.write_text("# À moi\n")
+        stale = board / "Devoirs/TST — Ancien devoir.md"
+        stale.write_text("---\ngenere_par: moodle-bridge\n---\n")
+        state = sync.load_state(cfg.state_path)
+        before = (board / "Matières/TST.md").stat().st_mtime_ns
+        written = vault.write(cfg, state)
+        self.assertNotIn(board / "Matières/TST.md", written)  # contenu inchangé : note non réécrite
+        self.assertEqual((board / "Matières/TST.md").stat().st_mtime_ns, before)
+        self.assertTrue(mine.exists())
+        self.assertFalse(stale.exists())
+
+    def test_grades_never_show_a_mystery(self):
+        try:
+            from mb import notes
+        except ImportError:
+            self.skipTest("édition sans relevé des notes")
+        tmp, cfg, _client = self._sync(notes={"enabled": True})
+        grade = lambda raw: {"raw": raw, "min": 0, "max": 20, "formatted": str(raw)}  # noqa: E731
+        state = notes.empty_state()
+        state["items"] = {
+            "10/1": {"name": "Examen final", "courseid": 10, "status": "mystery", "grade": grade(17.25),
+                     "mystery": {"emoji": "🦉", "color": "#123456", "teaser": "Une chouette surprise"},
+                     "detected_at": "2026-10-30T10:00:00"},
+            "10/2": {"name": "TP noté", "courseid": 10, "status": "revealed", "grade": grade(13.5),
+                     "revealed_at": "2026-10-30T11:00:00"},
+            "10/3": {"name": "Oral", "courseid": 10, "status": "none", "grade": None}}
+        notes.state_path(cfg).write_text(json.dumps(state))
+        vault.write(cfg, sync.load_state(cfg.state_path))
+        board = tmp / "Vault/Tableau de bord"
+        pages = "".join(p.read_text() for p in board.rglob("*.md"))
+        self.assertNotIn("17,25", pages)
+        self.assertNotIn("17.25", pages)
+        page = (board / "Notes.md").read_text()
+        for expected in ("🦉 à découvrir dans l'application", "Une chouette surprise", "13,5 / 20", "pas encore notée"):
+            self.assertIn(expected, page)
+        self.assertIn("1 note(s) à découvrir", (board / "Accueil.md").read_text())
+
+        # Relevé des notes désactivé et vide : la page Notes disparaît
+        notes.state_path(cfg).unlink()
+        cfg.data["notes"]["enabled"] = False
+        vault.write(cfg, sync.load_state(cfg.state_path))
+        self.assertFalse((board / "Notes.md").exists())
 
 
 @unittest.skipIf(snapshot is None, "édition sans application de barre des menus")
