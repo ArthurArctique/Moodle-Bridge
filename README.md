@@ -12,7 +12,7 @@ Il tient à jour un **coffre Obsidian** bien rangé : une page d'accueil, une no
 
 - **Lecture seule** : rien n'est jamais déposé, posté ni marqué comme lu sur Moodle.
 - **Rien n'est écrasé** : tes annotations dans un PDF restent intactes. Une nouvelle version arrive à côté de l'ancienne.
-- **Python seul**, sans paquet à installer. macOS, Windows et Linux.
+- **Python seul**, sans paquet à installer. macOS, et en théorie Windows et Linux ([non testés](#prérequis)).
 
 ## Éditions
 
@@ -26,6 +26,9 @@ Le dépôt a plusieurs branches. Tu es sur **`cli-ia`** :
 | [`skill`](../../tree/skill) | utilisateurs d'agents IA | le skill seul : ton agent (Claude Code, Codex…) te guide dans l'installation |
 
 ## Prérequis
+
+> [!WARNING]
+> **Windows et Linux : rien n'a été testé.** Je n'utilise Moodle Bridge que sur macOS. Tout ce qui concerne Windows et Linux (installation, coffre du système, tâche planifiée, notifications) a été écrit par une IA et n'a jamais été lancé sur ces systèmes : c'est théorique. Ça marchera peut-être, ou pas. Si tu essaies, raconte-moi dans une *issue*.
 
 - **Python 3.9 ou plus récent** :
   - Windows : installe Python depuis https://www.python.org/downloads/ en cochant « Add python.exe to PATH ». Vérifie ensuite avec `py --version` dans PowerShell. Le Microsoft Store convient aussi.
@@ -257,7 +260,7 @@ Cette commande retire la synchronisation automatique et le jeton. Tes fichiers r
 
 Voir [docs/depannage.md](docs/depannage.md). Le premier réflexe est `status`, qui donne le dernier succès, le dernier échec et l'état de la tâche planifiée.
 
-> **Windows et Linux** : le support est récent. La synchronisation, le coffre du système et la tâche planifiée sont prévus pour ces systèmes, mais l'outil a surtout été éprouvé sur macOS. Signale tout souci dans une *issue*.
+> **Windows et Linux** : jamais testés, voir l'avertissement des [Prérequis](#prérequis). Si quelque chose casse, signale-le dans une *issue*.
 
 ## Licence
 
