@@ -32,8 +32,6 @@ Journaux :
 | `CERTIFICATE_VERIFY_FAILED` (macOS) | Le Python de python.org n'a pas encore ses certificats : lance *Applications → Python 3.x → Install Certificates.command*. |
 | Des fichiers dans `_a_classer/` | Normal : le pont préfère ne pas deviner. Déplace-les dans le bon dossier, la synchronisation suivante les retrouve par leur empreinte. |
 | Un nouveau cours « non configuré » | `courses --add-all`, ou relance `install.py`. |
-| « claude indisponible », « Not logged in » | La commande d'IA n'est pas connectée : `claude auth login` ou `codex login`. En attendant, les fichiers ambigus vont dans `_a_classer/`. |
-| Codex : « model is not supported » | Indique dans `classify.model` un modèle disponible pour ton compte. |
 | Les vidéos ne sont pas téléchargées | Volontaire : elles sont listées avec leur lien Moodle (`exclude.list_only_mimetypes`). |
 
 ## La synchronisation automatique ne tourne pas

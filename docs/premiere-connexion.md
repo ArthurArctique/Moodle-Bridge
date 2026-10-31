@@ -81,7 +81,6 @@ Beaucoup d'établissements n'affichent pas cette ligne. Utilise alors une des de
 
 Le jeton est vérifié auprès de Moodle : `✓ Connecté … en tant que …`. Sa durée de validité dépend de ton établissement, de quelques semaines à plusieurs années. Quand il expire :
 - le tableau de bord affiche « jeton refusé » ;
-- l'application macOS affiche un triangle ;
 - une notification te prévient.
 
 Il suffit alors de relancer `token`.

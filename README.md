@@ -1,11 +1,11 @@
 # Moodle Bridge
 
-**Tes cours Moodle dans un dossier de ton ordinateur, à jour tout seul.**
+**Tes cours Moodle dans un dossier de ton ordinateur, à jour tout seul.** Édition `outil` : la connexion et la synchronisation, sans IA ni interface.
 
 Moodle Bridge se connecte à ton Moodle comme le fait l'appli mobile officielle et récupère automatiquement :
 - les **documents** des cours (PDF, diaporamas, sujets, archives…), rangés dans un dossier par cours ;
 - les **devoirs et échéances** ;
-- les **annonces**, avec un résumé si une IA est branchée ;
+- les **annonces** ;
 - les **textes** de Moodle : consignes, pages, présentations des sections, modalités de contrôle.
 
 Il tient à jour un **tableau de bord** en Markdown (`Moodle.md`) : à rendre bientôt, nouveautés, annonces, puis chaque cours section par section, avec un lien vers chaque fichier.
@@ -16,13 +16,13 @@ Il tient à jour un **tableau de bord** en Markdown (`Moodle.md`) : à rendre bi
 
 ## Éditions
 
-Le dépôt a plusieurs branches. Choisis la tienne :
+Le dépôt a plusieurs branches. Tu es sur **`outil`** :
 
 | Branche | Pour qui | Contenu |
 |---|---|---|
-| **`main`** | tout le monde, clé en main | tout : synchronisation, IA facultative, application de barre des menus (macOS), notes, skill pour agents IA |
+| [`main`](../../tree/main) | tout le monde, clé en main | tout : synchronisation, IA facultative, application de barre des menus (macOS), notes, skill pour agents IA |
 | [`cli-ia`](../../tree/cli-ia) | Windows, Linux, ou macOS sans application | synchronisation, IA facultative par ligne de commande, skill pour agents IA |
-| [`outil`](../../tree/outil) | « juste la connexion » | synchronisation, rangement par section Moodle, tableau de bord Markdown ; aucune IA, aucune interface |
+| **`outil`** | « juste la connexion » | synchronisation, rangement par section Moodle, tableau de bord Markdown ; aucune IA, aucune interface |
 | [`skill`](../../tree/skill) | utilisateurs d'agents IA | le skill seul : ton agent (Claude Code, Codex…) te guide dans l'installation |
 
 ## Prérequis
@@ -37,7 +37,7 @@ Le dépôt a plusieurs branches. Choisis la tienne :
 ## Installation
 
 ```bash
-git clone https://github.com/ArthurArctique/Moodle-Bridge.git
+git clone --branch outil https://github.com/ArthurArctique/Moodle-Bridge.git
 cd Moodle-Bridge
 python3 install.py
 ```
@@ -49,13 +49,12 @@ L'assistant pose quelques questions. Chacune a une valeur par défaut : Entrée 
 1. **L'adresse de ton Moodle** : copie celle de la barre d'adresse, n'importe quelle page de Moodle convient.
 2. **Où ranger tes cours** : `~/Moodle` par défaut, ou un dossier de ton coffre Obsidian s'il en trouve un.
 3. **L'index et les textes** : `Moodle.md` et `Textes Moodle/`, dans ce dossier.
-4. **Une IA** pour ranger les fichiers ambigus et résumer les annonces : facultatif, voir [IA](#ia-facultative).
-5. **La fréquence** de synchronisation : toutes les 2 h par défaut.
-6. **La connexion à Moodle**, voir juste en dessous.
-7. **Les cours à suivre** : tous par défaut, tu peux en exclure.
-8. **Pour finir** : première synchronisation, synchronisation automatique, puis selon l'édition l'application macOS et le skill pour tes agents IA.
+4. **La fréquence** de synchronisation : toutes les 2 h par défaut.
+5. **La connexion à Moodle**, voir juste en dessous.
+6. **Les cours à suivre** : tous par défaut, tu peux en exclure. Chaque cours est rangé par section Moodle.
+7. **Pour finir** : première synchronisation, puis synchronisation automatique.
 
-Tu peux relancer `install.py` quand tu veux, par exemple pour ajouter des cours ou activer l'IA. L'installation est mise à jour sans rien perdre.
+Tu peux relancer `install.py` quand tu veux, par exemple pour ajouter des cours. L'installation est mise à jour sans rien perdre.
 
 ## Première connexion à Moodle
 
@@ -120,7 +119,7 @@ Le **Markdown** est du texte avec une mise en forme légère : titres, listes, t
 - **Typora**, **MarkText**, **Zettlr** ou tout autre éditeur Markdown ;
 - ton explorateur de fichiers, pour les documents eux-mêmes : ils sont rangés dans des dossiers lisibles, un par cours.
 
-Tes agents IA (Claude Code, Codex…) lisent aussi ces fichiers directement : voir [Agents IA](#agents-ia-skill).
+Ce sont des fichiers ordinaires : n'importe quel outil peut les lire, y compris un agent IA ou tes propres scripts. Le format de l'état est décrit dans [docs/architecture.md](docs/architecture.md#létat-statejson).
 
 ## Architecture
 
@@ -131,25 +130,27 @@ flowchart LR
     subgraph O[Ton ordinateur]
         T([Tâche planifiée<br/>toutes les 2 h]) --> P[Moodle Bridge]
         J[[Coffre du système<br/>jeton]] -.-> P
-        IA[[IA facultative<br/>Claude Code, Codex, Ollama…]] -.-> P
         P --> D[📁 Dossier des cours<br/>un dossier par cours]
         P --> I[📄 Moodle.md<br/>tableau de bord]
         P --> X[📄 Textes Moodle<br/>consignes, annonces, MCC]
         P --> S[(état .moodle-bridge)]
-        S --> A[Application barre des menus<br/>macOS]
     end
 
     D & I & X --> R[Obsidian, VS Code<br/>ou autre lecteur Markdown]
-    D & I & X & S --> G[Tes agents IA<br/>via le skill]
 ```
 
 1. **La tâche planifiée** lance Moodle Bridge toutes les 2 h. Selon le système, c'est launchd sur macOS, le Planificateur de tâches sur Windows et cron sur Linux. Un passage manqué, ordinateur éteint ou en veille, est rattrapé au réveil.
-2. **Moodle Bridge** demande à Moodle ce qui a changé, avec le jeton rangé dans le coffre du système. Il télécharge les nouveaux documents et les range dans ton dossier.
-3. **Le rangement** se fait par section Moodle, ou par séance (CM/TD/TP) avec l'aide d'une IA. Un fichier incertain va dans `_a_classer/` plutôt que dans un mauvais dossier.
-4. **Le tableau de bord et les textes** sont réécrits à chaque passage. Ne les modifie pas : tes notes vont dans tes propres fichiers.
-5. **Tu lis** le tout dans Obsidian ou VS Code. **Tes agents IA** y accèdent grâce au skill. **L'application de barre des menus** (macOS) affiche l'état et les nouveautés sans jamais contacter Moodle elle-même.
+2. **Moodle Bridge** demande à Moodle ce qui a changé, avec le jeton rangé dans le coffre du système. Il télécharge les nouveaux documents et les range dans ton dossier, un sous-dossier par section Moodle.
+3. **Le tableau de bord et les textes** sont réécrits à chaque passage. Ne les modifie pas : tes notes vont dans tes propres fichiers.
+4. **Tu lis** le tout dans Obsidian, VS Code ou ton explorateur de fichiers.
 
-Le fonctionnement interne (modules, état, règles de rangement) est décrit dans [`docs/architecture.md` de la branche `outil`](../../blob/outil/docs/architecture.md), et pour les agents dans [skill/references/](skill/references/).
+Le fonctionnement interne est décrit dans [docs/architecture.md](docs/architecture.md) :
+- les modules ;
+- les fichiers et l'état ;
+- le déroulement d'un passage ;
+- les règles de rangement ;
+- les fonctions de l'API Moodle utilisées ;
+- tous les réglages.
 
 ## Au quotidien
 
@@ -163,53 +164,15 @@ python3 scripts/moodle_bridge.py courses --config ~/Moodle/.moodle-bridge/config
 python3 scripts/moodle_bridge.py texts   --config ~/Moodle/.moodle-bridge/config.json --mcc   # modalités de contrôle
 ```
 
-- **Un fichier dans `_a_classer/`** : déplace-le où tu veux, la synchronisation suivante le retrouve par son empreinte.
 - **Un fichier mal rangé** : déplace-le aussi. Rien n'est retéléchargé.
 - **Un nouveau semestre** : relance `install.py`, ou utilise `courses --add-all`.
 - **Les réglages** sont dans `.moodle-bridge/config.json` : voir [docs/configuration.md](docs/configuration.md).
-
-## IA (facultative)
-
-Sans IA, chaque cours est rangé par section Moodle, ce qui suffit souvent. Avec une IA, les fichiers sont rangés par séance (`CM/CM01`, `TD/TD03`, `TP/TP02`…), même quand Moodle les présente autrement. Les annonces longues sont aussi résumées en quelques lignes.
-
-Moodle Bridge n'a **aucune clé d'API à configurer**. Il passe par une ligne de commande que tu utilises déjà :
-- **Claude Code** (`claude`) : ton abonnement Claude, petit modèle Haiku par défaut ;
-- **Codex** (`codex`) : ton compte ChatGPT ;
-- **toute autre commande** qui lit une demande et répond, par exemple `ollama run llama3.2` pour une IA 100 % locale.
-
-**Ce qui est envoyé** : les noms des fichiers et des sections, l'arborescence du cours et le texte des annonces. Le contenu des documents n'est jamais envoyé. Un passage sans nouveauté ne consomme rien. Détails : [docs/ia.md](docs/ia.md).
-
-## Agents IA (skill)
-
-Les éditions `main` et `cli-ia` installent un **skill**, c'est-à-dire un mode d'emploi pour Claude Code, Codex ou tout agent qui lit les fichiers `SKILL.md`. Ton agent sait alors :
-- où sont tes cours, le tableau de bord et les réglages ;
-- quelles commandes lancer ;
-- quoi modifier selon ta demande.
-
-Tu peux lui demander « qu'est-ce que j'ai à rendre cette semaine ? », « synchronise Moodle », « range ce fichier » ou « comment est calculée la note de cette UE ? ».
-
-```bash
-python3 scripts/moodle_bridge.py skill install --config ~/Moodle/.moodle-bridge/config.json --target claude   # ou codex, both
-```
-
-Pour un autre agent, utilise `--dest <dossier de skills de l'agent>`. Tu n'as pas encore installé Moodle Bridge ? La branche [`skill`](../../tree/skill) contient un skill d'amorçage : ton agent te pose les bonnes questions et fait l'installation avec toi.
-
-## Application de barre des menus (macOS)
-
-L'application affiche dans la barre des menus :
-- une icône d'état : à jour, en cours, en retard ou en échec ;
-- le nombre de nouveaux documents ;
-- un panneau avec les derniers documents, les échéances et les annonces (résumé au clic) ;
-- les nouvelles notes publiées sur Moodle, en « mystère » jusqu'à ce que tu cliques pour les découvrir (facultatif, `notes.enabled`) ;
-- un bouton « Synchroniser ».
-
-Elle est compilée sur ta machine pendant l'installation, ce qui demande les outils de développement d'Apple : `xcode-select --install`. Voir [docs/application-macos.md](docs/application-macos.md).
 
 ## Sécurité et vie privée
 
 - Le jeton reste dans le coffre-fort de ton système. Il n'est jamais écrit dans un fichier, ni dans les journaux, ni dans le tableau de bord. Tous les liens sont nettoyés du jeton.
 - Le mot de passe, si tu choisis cette méthode, sert une seule fois et n'est jamais stocké.
-- Moodle Bridge ne parle qu'à ton Moodle. Il ne contacte une IA que si tu l'as choisi, et uniquement par la ligne de commande que tu as désignée.
+- Moodle Bridge ne parle qu'à ton Moodle. Aucune autre connexion, aucune IA dans cette édition.
 - Le dossier `.moodle-bridge/` (réglages, état, journaux) contient ton adresse Moodle et la liste de tes cours. Il est exclu de git par défaut : ne le publie pas.
 
 ## Désinstaller
@@ -218,10 +181,7 @@ Elle est compilée sur ta machine pendant l'installation, ce qui demande les out
 python3 scripts/moodle_bridge.py uninstall --config ~/Moodle/.moodle-bridge/config.json
 ```
 
-Cette commande retire la synchronisation automatique et le jeton. Tes fichiers restent en place. Ensuite, si tu veux tout effacer :
-- l'application macOS : `menubar uninstall` ;
-- le skill : supprime son dossier dans `~/.claude/skills` ou `~/.codex/skills` ;
-- le reste : supprime le dossier du dépôt, puis `.moodle-bridge/` dans ton dossier de cours.
+Cette commande retire la synchronisation automatique et le jeton. Tes fichiers restent en place. Pour tout effacer, supprime ensuite le dossier du dépôt, puis `.moodle-bridge/` dans ton dossier de cours.
 
 ## Dépannage
 

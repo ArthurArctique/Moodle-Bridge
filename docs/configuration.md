@@ -18,23 +18,25 @@ Chaque cours suivi a une entrée sous `courses`, repérée par son identifiant M
 |---|---|
 | `dest` | dossier du cours, relatif au dossier des cours ; il peut déjà exister et contenir tes fichiers |
 | `code` | nom court affiché dans le tableau de bord |
-| `mode` | `mirror` : un sous-dossier par section Moodle. `classify` : dossiers par séance (`CM/CM01`, `TD/TD03`…), avec l'IA pour les cas ambigus |
+| `mode` | `mirror` : un sous-dossier par section Moodle (conseillé dans cette édition). `classify` : rangement selon ton arborescence existante, voir ci-dessous |
 | `skip` | `true` pour ne plus suivre ce cours |
 | `routes` | envoyer certaines sections vers un autre dossier, par exemple `[{"sections": "^TP", "dest": "Info/TP", "code": "TP"}]` (expression régulière sur le nom de la section) |
 
 `courses --add-all` ajoute d'un coup tous les nouveaux cours, dans le mode de `default_mode`.
 
-## Le rangement par séance (`classify`)
+## Le rangement dans ton arborescence (`classify`)
+
+Cette édition n'a pas d'IA. En mode `classify`, un nouveau fichier est rangé seulement par des règles sûres :
+- un fichier identique existe déjà dans le dossier du cours : il reste où il est ;
+- une correction (`overrides`) lui impose un dossier ;
+- au moins deux fichiers déjà rangés de la même activité Moodle sont dans le même dossier : il les rejoint.
+
+Sinon, il va dans `_a_classer/`. Déplace-le à la main : la synchronisation suivante le retrouve par son empreinte, et ses voisins suivront.
 
 | Clé | Rôle |
 |---|---|
-| `classify.rules` | tes conventions, en quelques phrases, données telles quelles à l'IA |
-| `classify.new_dir_patterns` | dossiers que l'IA a le droit de créer (expressions régulières) ; les dossiers existants sont toujours permis |
-| `classify.min_confidence` | en dessous de ce niveau (0,8 par défaut), le fichier va dans `_a_classer/` |
 | `classify.inbox` | nom du dossier d'attente (`_a_classer`) |
 | `overrides` | corrections durables : `"<cours>/<activité>/<fichier>": "TD/TD07"`, avec la clé lue dans `state.json` |
-
-Le moteur d'IA lui-même est décrit dans [ia.md](ia.md).
 
 ## Ce qui est téléchargé
 
@@ -64,21 +66,6 @@ Le moteur d'IA lui-même est décrit dans [ia.md](ia.md).
 
 Après avoir changé l'intervalle, réinstalle la tâche : `schedule install`. `schedule uninstall` arrête la synchronisation automatique ; `schedule kick` lance un passage tout de suite.
 
-## Les notes (édition `main`, macOS)
+## Toutes les clés
 
-Désactivé par défaut. Quand une note est publiée sur Moodle, l'application de barre des menus l'annonce en **mystère** : un emoji, une couleur et une énigme choisis par l'IA, sans la valeur. Tu la découvres d'un clic.
-
-1. Dans `config.json` : `"notes": {"enabled": true}`.
-2. Relevé automatique, toutes les 15 min par défaut (`notes.interval_minutes`) : `notes schedule install --config …`.
-3. Vérifier : `notes status --config …`. Au premier relevé, les notes déjà publiées sont seulement mémorisées.
-
-| Clé | Rôle |
-|---|---|
-| `notes.exclude_modules` | activités jamais suivies : quiz d'entraînement, présence, SCORM… |
-| `notes.exclude_items`, `notes.include_items` | filtres sur le nom de l'élément (expressions régulières) ; l'inclusion l'emporte |
-| `notes.mystery.enabled` | `false` : notification sans énigme, avec 🎁 gris |
-| `notes.workbook` | report facultatif de chaque note découverte dans un classeur Excel : `path`, `sheet` et `map`, que `notes items` aide à remplir. La feuille doit avoir une colonne « Élément » et des colonnes « Note 1 », « Note 2 »… ; seule la case visée change, jamais une formule. `notes setup` installe une fois openpyxl dans un Python dédié |
-
-## Pour les agents IA
-
-La liste complète des clés, avec les supports de cours envoyés vers Zotero et le relevé des notes, est dans [skill/references/fonctionnement.md](../skill/references/fonctionnement.md).
+La liste complète, avec les supports de cours mis de côté pour Zotero, est dans [architecture.md](architecture.md#réglages).
