@@ -356,8 +356,12 @@ enum Fmt {
 
 @MainActor
 final class Bridge: ObservableObject {
+    #if DEMO
+    static var root = FileManager.default.temporaryDirectory  // dossier d'état fictif de la démo (menubar/demo)
+    #else
     static let root = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Caches/moodle-bridge", isDirectory: true)
+    #endif
 
     @Published private(set) var snapshots: [Snapshot] = []
     @Published private(set) var now = Date()
@@ -913,7 +917,9 @@ final class Bridge: ObservableObject {
 
 // MARK: - Application
 
+#if !DEMO  // la démo du README a son propre point d'entrée
 @main
+#endif
 struct MoodleBridgeApp: App {
     @StateObject private var bridge = Bridge()
 
@@ -987,7 +993,7 @@ struct TabBar: View {
             ForEach(Tab.allCases.filter { $0 != .ai || snap.aiArgv != nil }) { tab in
                 Button { selection = tab } label: {
                     HStack(spacing: 4) {
-                        Text(tab.title).lineLimit(1).minimumScaleFactor(0.85)
+                        Text(tab.title).lineLimit(1)
                         if let count = count(tab), count > 0 {
                             Text("\(count)")
                                 .font(.caption2.weight(.semibold).monospacedDigit())
@@ -998,6 +1004,10 @@ struct TabBar: View {
                         }
                     }
                     .font(.callout.weight(selection == tab ? .semibold : .regular))
+                    // Chaque onglet garde la largeur de son titre et de son compteur, le reste se partage :
+                    // à parts égales, « Documents 3 » serait tronqué
+                    .fixedSize()
+                    .padding(.horizontal, 3)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
                     .background(RoundedRectangle(cornerRadius: 6).fill(selection == tab ? Color.primary.opacity(0.1) : .clear))

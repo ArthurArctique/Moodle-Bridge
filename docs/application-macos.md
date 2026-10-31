@@ -2,6 +2,13 @@
 
 Une petite icône dans la barre des menus. Un clic ouvre un panneau, et l'application n'a pas d'autre fenêtre.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="img/demo-sombre.gif">
+    <img src="img/demo-clair.gif" width="45%" alt="Panneau de l'application, avec des données fictives">
+  </picture>
+</p>
+
 ## Ce qu'elle affiche
 
 - **L'icône** :
@@ -42,3 +49,13 @@ Si `pgrep -x MoodleBridge` affiche un numéro, l'application tourne, mais son ic
 - un **gestionnaire de barre des menus** (Bartender, Ice…) : fais passer l'icône dans la partie visible.
 
 Sinon, relance-la : `open ~/Applications/Moodle\ Bridge.app`.
+
+## Refaire l'animation
+
+L'animation de cette page et du README se refait après une modification de l'interface :
+
+```bash
+python3 menubar/demo/make_gif.py
+```
+
+Le script compile l'application en mode démo (`menubar/demo/Demo.swift`), la fait jouer hors de l'écran avec des données fictives, puis écrit `docs/img/demo-clair.gif` et `docs/img/demo-sombre.gif`. Il faut [Pillow](https://pypi.org/project/pillow/) : `python3 -m pip install pillow`. Ni l'état du pont ni l'application installée ne sont touchés.

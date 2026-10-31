@@ -14,6 +14,17 @@ Il tient à jour un **coffre Obsidian** bien rangé : une page d'accueil, une no
 - **Rien n'est écrasé** : tes annotations dans un PDF restent intactes. Une nouvelle version arrive à côté de l'ancienne.
 - **Python seul**, sans paquet à installer. macOS, Windows et Linux.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/demo-sombre.gif">
+    <img src="docs/img/demo-clair.gif" width="45%" alt="Panneau de l'application : synchronisation, échéances, résumé d'une annonce, note mystère découverte, choix de l'IA">
+  </picture>
+</p>
+
+<p align="center">
+  <em>L'application de barre des menus (macOS), avec des données fictives</em>
+</p>
+
 ## Éditions
 
 Le dépôt a plusieurs branches. Choisis la tienne :
