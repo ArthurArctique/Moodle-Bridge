@@ -16,7 +16,7 @@ from . import system
 
 ENGINES = ("none", "claude-cli", "codex-cli", "command")
 # Modèle par défaut de chaque moteur : un petit modèle suffit (None : celui que la commande choisit)
-DEFAULT_MODELS = {"claude-cli": "claude-haiku-5-5", "codex-cli": None, "command": None}
+DEFAULT_MODELS = {"claude-cli": "haiku", "codex-cli": None, "command": None}
 DEFAULT_COMMANDS = {"claude-cli": "claude", "codex-cli": "codex"}
 
 

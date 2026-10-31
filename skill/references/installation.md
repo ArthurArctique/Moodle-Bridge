@@ -8,7 +8,7 @@ Pour l'agent qui accompagne une installation. Les étapes sont détaillées pour
 
 1. **Site** : l'utilisateur colle l'adresse de son Moodle, n'importe quelle page convient. L'assistant vérifie que l'API de l'appli mobile est ouverte et repère le type de connexion.
 2. **Dossier des cours** : `~/Moodle` par défaut, ou un sous-dossier d'un coffre Obsidian existant.
-3. **Index et textes** : `Moodle.md` et `Textes Moodle/`, dans le dossier des cours.
+3. **Coffre Obsidian** : `Tableau de bord/` dans le dossier des cours par défaut. Si Obsidian est installé et que le dossier des cours n'est dans aucun coffre, l'assistant y crée `.obsidian` pour qu'Obsidian l'ouvre comme coffre. Les textes vont dans `.moodle-bridge/textes/`.
 4. **IA** (éditions `main` et `cli-ia`) : aucune, Claude Code, Codex ou une autre commande. L'assistant ne propose que les commandes présentes sur la machine.
 5. **Fréquence** : 120 min par défaut, 15 min au minimum.
 6. **Connexion à Moodle** : voir plus bas. Le jeton est vérifié auprès de Moodle.
@@ -26,8 +26,9 @@ Utile quand c'est l'agent qui pose les questions. Les réponses sont passées en
 | `site` | adresse du Moodle (obligatoire) | — |
 | `env` | dossier des cours | `~/Moodle` |
 | `reuse` | mettre à jour une installation existante dans `env` | `true` |
-| `index` | index, relatif à `env` (`null` : aucun) | `Moodle.md` |
-| `texts_dir` | dossier des textes, relatif à `env` | `Textes Moodle` |
+| `vault` | dossier des notes Obsidian générées, relatif à `env` (`null` ou `"aucun"` : pas de coffre) | `Tableau de bord` |
+| `index` | ancien tableau de bord en un fichier, relatif à `env` | `null` |
+| `texts_dir` | dossier des textes, relatif à `env` | `.moodle-bridge/textes` |
 | `engine` | `none`, `claude-cli`, `codex-cli`, `command` | la première commande trouvée, sinon `none` |
 | `command` | chemin de `claude` ou `codex`, ou commande complète pour `command` (liste ou chaîne ; `{model}` y est remplacé) | trouvé dans le `PATH` |
 | `model` | modèle de l'IA | petit modèle par défaut du moteur |
@@ -82,11 +83,11 @@ L'assistant convient à un dossier neuf. Pour brancher le pont sur une arboresce
 - **classify.rules** : les conventions de nommage en quelques lignes. Exemple : « CM/CM01, TD/TD01, numéro sur deux chiffres ; la numérotation locale fait foi ».
 - **classify.context_files** : fichiers de contexte donnés à l'IA, comme un index de correspondances ou un README d'arborescence. Pour un gros fichier, seules les lignes qui citent le code du cours sont envoyées.
 - **zotero** : si les supports de cours (diaporamas de CM, polycopiés, articles) vont dans une bibliothèque Zotero plutôt que dans les dossiers, régler `enabled: true`, `search_roots` (dossiers des pièces jointes) et ajouter la règle `dest = "@zotero"` dans `classify.rules`. L'import lui-même reste fait par un agent, avec l'accord de l'utilisateur (`references/fonctionnement.md`).
-- **index.path**, **texts.dir** : par exemple à la racine d'un coffre Obsidian.
+- **vault.dir**, **texts.dir** : le coffre peut aussi être placé hors du dossier des cours (chemin absolu), par exemple dans un coffre Obsidian existant ; les liens vers les fichiers deviennent alors des liens `file://`.
 - **Instructions de l'environnement** (`AGENTS.md`, `CLAUDE.md` ou équivalent), après accord sur le texte :
   - le chemin de la configuration ;
   - la règle de rattrapage : `status` en début de tâche, `sync` si en retard ;
-  - les écritures automatiques autorisées : copies dans les destinations, boîte d'attente, index, textes ;
+  - les écritures automatiques autorisées : copies dans les destinations, boîte d'attente, notes générées du coffre, textes ;
   - l'interdiction d'écrire vers Moodle et d'afficher le jeton.
 
 Pour un premier passage sur une arborescence existante, lancer d'abord `sync --dry-run`. Présenter ensuite le plan, ajouter les corrections dans `overrides`, puis lancer `sync`.

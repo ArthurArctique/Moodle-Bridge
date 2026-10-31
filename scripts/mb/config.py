@@ -58,6 +58,13 @@ DEFAULTS = {
         "mcc_title": r"modalit\w*\s+de\s+contr[ôo]le|\bMCCC?\b",
         "mcc_content": r"formule\s+de\s+calcul|calcul\s+de\s+la\s+note",
     },
+    # Coffre Obsidian généré : accueil, une note par matière, devoirs, échéances, annonces, notes
+    "vault": {
+        # Dossier des notes générées (relatif à env_root) ; null : pas de coffre
+        "dir": None,
+        "title": "Moodle",
+    },
+    # Ancien tableau de bord en un seul fichier ; null : aucun
     "index": {
         "path": None,
         "title": "Moodle",
@@ -142,6 +149,11 @@ class Config:
     @property
     def index_path(self):
         rel = self.data["index"].get("path")
+        return self.resolve(rel) if rel else None
+
+    @property
+    def vault_dir(self):
+        rel = self.data["vault"].get("dir")
         return self.resolve(rel) if rel else None
 
     @property

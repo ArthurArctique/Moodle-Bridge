@@ -1,6 +1,6 @@
 ---
 name: moodle-bridge
-description: "Moodle Bridge : synchronise en lecture seule les documents, devoirs, échéances, annonces et textes d'un Moodle vers un dossier local, avec un index Markdown lisible dans Obsidian ou VS Code. Utiliser dès qu'il est question de Moodle, de documents de cours, de devoirs, d'échéances, d'annonces ou de modalités de contrôle, ou quand l'utilisateur veut installer ou configurer Moodle Bridge. Ce skill n'est pas encore relié à une installation : il guide d'abord l'installation, puis se remplace par un skill adapté."
+description: "Moodle Bridge : synchronise en lecture seule les documents, devoirs, échéances, annonces et textes d'un Moodle vers un dossier local, avec un coffre Obsidian généré (une note par matière, devoirs, échéances, annonces). Utiliser dès qu'il est question de Moodle, de documents de cours, de devoirs, d'échéances, d'annonces ou de modalités de contrôle, ou quand l'utilisateur veut installer ou configurer Moodle Bridge. Ce skill n'est pas encore relié à une installation : il guide d'abord l'installation, puis se remplace par un skill adapté."
 ---
 <!-- moodle-bridge-skill: bootstrap -->
 # Moodle Bridge — premier usage
@@ -23,9 +23,9 @@ Cherche aussi un clone du dépôt, reconnaissable à `scripts/moodle_bridge.py` 
 Pose ces questions, en une fois si possible :
 
 1. **Système** : macOS, Windows ou Linux ? Tu peux le constater toi-même.
-2. **IA** : veut-il qu'une IA range les fichiers ambigus (CM/TD/TP numérotés) et résume les annonces ? Elle passe par une ligne de commande déjà installée et connectée (Claude Code, Codex, ou une commande comme Ollama), sans clé d'API. Sans IA, les fichiers sont rangés par section Moodle.
+2. **IA** : veut-il qu'une IA range les fichiers ambigus (CM/TD/TP numérotés) et résume les annonces ? Elle passe par une ligne de commande déjà installée et connectée (Claude Code, Codex, ou une commande comme Ollama), sans clé d'API. Sans IA, les fichiers sont rangés par section Moodle et le coffre Obsidian est le même : il ne dépend jamais d'un modèle. Le choix se change ensuite à tout moment (commande `ai`, `Choisir-IA`, onglet IA de l'application).
 3. **macOS seulement** : veut-il l'application de barre des menus (état, nouveaux documents, annonces, notes) ?
-4. **Lecture** : a-t-il Obsidian, VS Code ou un autre lecteur Markdown ? Ce n'est pas obligatoire, mais l'index et les textes sont des fichiers Markdown pensés pour Obsidian. Sans lecteur, ils restent des fichiers texte bruts.
+4. **Lecture** : a-t-il Obsidian, VS Code ou un autre lecteur Markdown ? Ce n'est pas obligatoire, mais le coffre (accueil, une note par matière, devoirs, échéances, annonces, notes) est pensé pour Obsidian. Sans lecteur, ce sont des fichiers Markdown bruts.
 
 Choisis l'édition (une branche du dépôt) d'après ses réponses :
 
@@ -33,7 +33,7 @@ Choisis l'édition (une branche du dépôt) d'après ses réponses :
 |---|---|---|
 | `main` | tout le monde, clé en main | pont, IA facultative, application macOS, notes, skill |
 | `cli-ia` | Windows, Linux, ou macOS sans application | pont, IA facultative, skill |
-| `outil` | « juste la connexion » | pont seul : synchronisation, rangement par section, index Markdown |
+| `outil` | « juste la connexion » | pont seul : synchronisation, rangement par section, coffre Obsidian |
 
 Passer par ce skill, c'est utiliser un agent : recommande `cli-ia`, ou `main` sur macOS si l'utilisateur veut l'application. L'édition `outil` n'a pas de commande `skill` pour te relier à l'installation : ne la propose que s'il la demande.
 

@@ -14,9 +14,11 @@ Une petite icône dans la barre des menus. Un clic ouvre un panneau, et l'applic
 - **Échéances** : devoirs et événements à venir.
 - **Annonces** : un clic affiche le résumé (ou le texte d'une annonce courte), un autre ouvre l'annonce sur Moodle.
 - **Notes** (si activées) : une nouvelle note arrive en **mystère**, avec un emoji, une couleur et une énigme. Sa valeur ne s'affiche qu'au clic sur « Découvrir ».
+- **IA** : l'IA utilisée et son modèle, à changer d'un clic. Voir [Changer de modèle](ia.md#changer-de-modèle).
 - **Historique** des derniers passages et bouton **Synchroniser**, qui lance tout de suite la tâche planifiée.
+- **Coffre** : ouvre la note d'accueil du coffre Obsidian. Si Obsidian ne connaît pas encore ce coffre, la note s'ouvre dans l'éditeur par défaut et le panneau indique quel dossier ouvrir comme coffre.
 
-L'application **ne contacte jamais Moodle** et n'a pas accès au jeton. Elle lit l'état que Moodle Bridge écrit dans `~/Library/Caches/moodle-bridge/` à chaque passage. Une seule application sert toutes les installations du Mac.
+L'application **ne contacte jamais Moodle** et n'a pas accès au jeton. Seul l'onglet IA lance une commande : celle du pont (`ai status`, `ai set`, `ai test`), qui interroge Claude Code ou Codex sur ta machine. Elle lit l'état que Moodle Bridge écrit dans `~/Library/Caches/moodle-bridge/` à chaque passage. Une seule application sert toutes les installations du Mac.
 
 ## Installation
 

@@ -8,7 +8,7 @@ Moodle Bridge se connecte à ton Moodle comme le fait l'appli mobile officielle 
 - les **annonces**, avec un résumé si une IA est branchée ;
 - les **textes** de Moodle : consignes, pages, présentations des sections, modalités de contrôle.
 
-Il tient à jour un **tableau de bord** en Markdown (`Moodle.md`) : à rendre bientôt, nouveautés, annonces, puis chaque cours section par section, avec un lien vers chaque fichier.
+Il tient à jour un **coffre Obsidian** bien rangé : une page d'accueil, une note par matière, une note par devoir, les annonces, les modalités de contrôle et tes notes en tableaux, avec un lien vers chaque fichier. Ces notes sont générées sans IA, à chaque passage.
 
 - **Lecture seule** : rien n'est jamais déposé, posté ni marqué comme lu sur Moodle.
 - **Rien n'est écrasé** : tes annotations dans un PDF restent intactes. Une nouvelle version arrive à côté de l'ancienne.
@@ -22,7 +22,7 @@ Le dépôt a plusieurs branches. Choisis la tienne :
 |---|---|---|
 | **`main`** | tout le monde, clé en main | tout : synchronisation, IA facultative, application de barre des menus (macOS), notes, skill pour agents IA |
 | [`cli-ia`](../../tree/cli-ia) | Windows, Linux, ou macOS sans application | synchronisation, IA facultative par ligne de commande, skill pour agents IA |
-| [`outil`](../../tree/outil) | « juste la connexion » | synchronisation, rangement par section Moodle, tableau de bord Markdown ; aucune IA, aucune interface |
+| [`outil`](../../tree/outil) | « juste la connexion » | synchronisation, rangement par section Moodle, coffre Obsidian ; aucune IA, aucune interface |
 | [`skill`](../../tree/skill) | utilisateurs d'agents IA | le skill seul : ton agent (Claude Code, Codex…) te guide dans l'installation |
 
 ## Prérequis
@@ -48,7 +48,7 @@ L'assistant pose quelques questions. Chacune a une valeur par défaut : Entrée 
 
 1. **L'adresse de ton Moodle** : copie celle de la barre d'adresse, n'importe quelle page de Moodle convient.
 2. **Où ranger tes cours** : `~/Moodle` par défaut, ou un dossier de ton coffre Obsidian s'il en trouve un.
-3. **L'index et les textes** : `Moodle.md` et `Textes Moodle/`, dans ce dossier.
+3. **Le coffre Obsidian** : le sous-dossier `Tableau de bord` de ton dossier de cours (« aucun » pour s'en passer).
 4. **Une IA** pour ranger les fichiers ambigus et résumer les annonces : facultatif, voir [IA](#ia-facultative).
 5. **La fréquence** de synchronisation : toutes les 2 h par défaut.
 6. **La connexion à Moodle**, voir juste en dessous.
@@ -93,27 +93,34 @@ Certains Moodle affichent la clé dans *Profil → Préférences → Clés de s�
 
 Guide détaillé et cas particuliers : [docs/premiere-connexion.md](docs/premiere-connexion.md).
 
-Si le jeton expire (`jeton refusé` dans le tableau de bord ou une notification), relance simplement :
+Si le jeton expire (`jeton refusé` dans l'accueil du coffre ou une notification), relance simplement :
 
 ```bash
 python3 scripts/moodle_bridge.py token --config ~/Moodle/.moodle-bridge/config.json
 ```
 
-## Lire tes données : Obsidian, VS Code ou autre
+## Lire tes données : le coffre Obsidian
 
-Tout ce que produit Moodle Bridge est un dossier de fichiers ordinaires :
-- tes documents, rangés par cours ;
-- `Moodle.md`, le tableau de bord ;
-- `Textes Moodle/`, un fichier Markdown par cours.
+Tout ce que produit Moodle Bridge est un dossier de fichiers ordinaires : tes documents, rangés par cours, et un **coffre Obsidian** dans `Tableau de bord/`.
 
-Le **Markdown** est du texte avec une mise en forme légère : titres, listes, tableaux, liens. Il est lisible partout, mais un **lecteur Markdown** le rend vraiment agréable : les titres deviennent des titres, les tableaux des tableaux, et chaque lien ouvre le PDF ou la page Moodle d'un clic. Sans lecteur, tu verras du texte brut avec des `#`, des `|` et des `[liens](…)`.
+| Note | Contenu |
+|---|---|
+| `Accueil` | la semaine à venir, les annonces récentes, les nouveaux documents, ce qui attend une action, le tableau des matières |
+| `Matières/<CODE>` | une note par matière : échéances, annonces, modalités de contrôle, notes, puis tout le contenu section par section (textes, documents, devoirs) |
+| `Devoirs/<CODE> — <devoir>` | date limite, consignes, pièces jointes et lien de dépôt |
+| `Échéances`, `Annonces`, `Documents`, `Modalités de contrôle` | les mêmes informations, tous cours confondus |
+| `Notes` | tes notes en tableaux, par matière (édition `main`, si le relevé des notes est activé) |
 
-**[Obsidian](https://obsidian.md)** (gratuit) est le plus confortable pour naviguer dans ces données. Ouvre ton dossier de cours comme un *coffre* : *Ouvrir un dossier comme coffre*. Tu y gagnes :
-- le tableau de bord en page d'accueil, avec liens cliquables vers chaque PDF et chaque annonce ;
+Ces notes sont **déterministes** : aucune IA ne les écrit. Elles sont régénérées à chaque passage à partir de ce que Moodle renvoie, et réécrites seulement quand leur contenu change. Leurs propriétés (matière, date limite, statut…) servent aux recherches et aux bases d'Obsidian. Le résumé d'une annonce n'apparaît que si une IA l'a déjà fait. Une note encore « mystère » n'y montre jamais sa valeur.
+
+**Tes propres notes ne sont jamais touchées**, même posées dans `Tableau de bord/` : le pont ne modifie et ne supprime que les notes qui portent sa propriété `genere_par: moodle-bridge`.
+
+**[Obsidian](https://obsidian.md)** (gratuit) est le plus confortable pour naviguer dans ces données. Ouvre ton dossier de cours comme un *coffre* (*Ouvrir un dossier comme coffre*), puis la note `Tableau de bord/Accueil`. Tu y gagnes :
+- des liens entre accueil, matières et devoirs, et vers chaque PDF et chaque page Moodle ;
 - l'ouverture des PDF dans Obsidian même, pour lire sans changer d'application ;
 - la recherche plein texte dans les consignes, les annonces et les modalités de contrôle de tous les cours ;
 - tes propres notes à côté des cours, avec des liens vers les documents synchronisés ;
-- la mise à jour en direct : le tableau de bord change sous tes yeux après chaque synchronisation.
+- la mise à jour en direct après chaque synchronisation.
 
 **Obsidian n'est pas obligatoire.** Si tu ne l'as pas, les fichiers sont créés exactement pareil. Tu peux les ouvrir avec :
 - **VS Code** : ouvre le dossier, puis `Ctrl+Maj+V` (`Cmd+Maj+V` sur Mac) affiche l'aperçu du Markdown ;
@@ -133,27 +140,26 @@ flowchart LR
         J[[Coffre du système<br/>jeton]] -.-> P
         IA[[IA facultative<br/>Claude Code, Codex, Ollama…]] -.-> P
         P --> D[📁 Dossier des cours<br/>un dossier par cours]
-        P --> I[📄 Moodle.md<br/>tableau de bord]
-        P --> X[📄 Textes Moodle<br/>consignes, annonces, MCC]
+        P --> V[📒 Tableau de bord<br/>coffre Obsidian : accueil,<br/>matières, devoirs, notes]
         P --> S[(état .moodle-bridge)]
         S --> A[Application barre des menus<br/>macOS]
     end
 
-    D & I & X --> R[Obsidian, VS Code<br/>ou autre lecteur Markdown]
-    D & I & X & S --> G[Tes agents IA<br/>via le skill]
+    D & V --> R[Obsidian, VS Code<br/>ou autre lecteur Markdown]
+    D & V & S --> G[Tes agents IA<br/>via le skill]
 ```
 
 1. **La tâche planifiée** lance Moodle Bridge toutes les 2 h. Selon le système, c'est launchd sur macOS, le Planificateur de tâches sur Windows et cron sur Linux. Un passage manqué, ordinateur éteint ou en veille, est rattrapé au réveil.
 2. **Moodle Bridge** demande à Moodle ce qui a changé, avec le jeton rangé dans le coffre du système. Il télécharge les nouveaux documents et les range dans ton dossier.
 3. **Le rangement** se fait par section Moodle, ou par séance (CM/TD/TP) avec l'aide d'une IA. Un fichier incertain va dans `_a_classer/` plutôt que dans un mauvais dossier.
-4. **Le tableau de bord et les textes** sont réécrits à chaque passage. Ne les modifie pas : tes notes vont dans tes propres fichiers.
+4. **Le coffre Obsidian** est régénéré à chaque passage, sans IA. Ne modifie pas ses notes : les tiennes vont dans tes propres fichiers.
 5. **Tu lis** le tout dans Obsidian ou VS Code. **Tes agents IA** y accèdent grâce au skill. **L'application de barre des menus** (macOS) affiche l'état et les nouveautés sans jamais contacter Moodle elle-même.
 
 Le fonctionnement interne (modules, état, règles de rangement) est décrit dans [`docs/architecture.md` de la branche `outil`](../../blob/outil/docs/architecture.md), et pour les agents dans [skill/references/](skill/references/).
 
 ## Au quotidien
 
-Il n'y a rien à faire : la synchronisation tourne toute seule. Ouvre `Moodle.md` pour voir les nouveautés. Pour agir à la main :
+Il n'y a rien à faire : la synchronisation tourne toute seule. Ouvre la note `Accueil` du coffre pour voir les nouveautés. Pour agir à la main :
 
 ```bash
 # remplace ~/Moodle par ton dossier de cours
@@ -179,10 +185,19 @@ Moodle Bridge n'a **aucune clé d'API à configurer**. Il passe par une ligne de
 
 **Ce qui est envoyé** : les noms des fichiers et des sections, l'arborescence du cours et le texte des annonces. Le contenu des documents n'est jamais envoyé. Un passage sans nouveauté ne consomme rien. Détails : [docs/ia.md](docs/ia.md).
 
+### Changer d'IA ou de modèle
+
+Trois façons, au choix :
+- **Application macOS** : onglet **IA** du menu Moodle Bridge. Clique sur une IA, puis choisis le modèle dans la liste. Une IA installée mais pas connectée affiche **Se connecter…**, qui ouvre la connexion dans un terminal.
+- **Double-clic** sur `Choisir-IA.command` (macOS) ou `Choisir-IA.bat` (Windows), à la racine du dépôt. Le lanceur montre les IA installées et connectées, propose de se connecter, liste les modèles, puis fait un essai.
+- **Terminal** : `python3 scripts/moodle_bridge.py ai` pose les mêmes questions ; `ai status`, `ai set --engine claude-cli --model sonnet` et `ai test` font chaque étape séparément.
+
+Le modèle choisi sert à tout : rangement, résumés des annonces et énigmes des notes.
+
 ## Agents IA (skill)
 
 Les éditions `main` et `cli-ia` installent un **skill**, c'est-à-dire un mode d'emploi pour Claude Code, Codex ou tout agent qui lit les fichiers `SKILL.md`. Ton agent sait alors :
-- où sont tes cours, le tableau de bord et les réglages ;
+- où sont tes cours, le coffre Obsidian et les réglages ;
 - quelles commandes lancer ;
 - quoi modifier selon ta demande.
 
@@ -201,13 +216,14 @@ L'application affiche dans la barre des menus :
 - le nombre de nouveaux documents ;
 - un panneau avec les derniers documents, les échéances et les annonces (résumé au clic) ;
 - les nouvelles notes publiées sur Moodle, en « mystère » jusqu'à ce que tu cliques pour les découvrir (facultatif, `notes.enabled`) ;
-- un bouton « Synchroniser ».
+- un onglet **IA** pour changer d'IA ou de modèle, et s'y connecter ;
+- un bouton « Synchroniser », et un bouton « Coffre » qui ouvre l'accueil dans Obsidian.
 
 Elle est compilée sur ta machine pendant l'installation, ce qui demande les outils de développement d'Apple : `xcode-select --install`. Voir [docs/application-macos.md](docs/application-macos.md).
 
 ## Sécurité et vie privée
 
-- Le jeton reste dans le coffre-fort de ton système. Il n'est jamais écrit dans un fichier, ni dans les journaux, ni dans le tableau de bord. Tous les liens sont nettoyés du jeton.
+- Le jeton reste dans le coffre-fort de ton système. Il n'est jamais écrit dans un fichier, ni dans les journaux, ni dans le coffre Obsidian. Tous les liens sont nettoyés du jeton.
 - Le mot de passe, si tu choisis cette méthode, sert une seule fois et n'est jamais stocké.
 - Moodle Bridge ne parle qu'à ton Moodle. Il ne contacte une IA que si tu l'as choisi, et uniquement par la ligne de commande que tu as désignée.
 - Le dossier `.moodle-bridge/` (réglages, état, journaux) contient ton adresse Moodle et la liste de tes cours. Il est exclu de git par défaut : ne le publie pas.

@@ -33,8 +33,11 @@ Journaux :
 | Des fichiers dans `_a_classer/` | Normal : le pont préfère ne pas deviner. Déplace-les dans le bon dossier, la synchronisation suivante les retrouve par leur empreinte. |
 | Un nouveau cours « non configuré » | `courses --add-all`, ou relance `install.py`. |
 | « claude indisponible », « Not logged in » | La commande d'IA n'est pas connectée : `claude auth login` ou `codex login`. En attendant, les fichiers ambigus vont dans `_a_classer/`. |
-| Codex : « model is not supported » | Indique dans `classify.model` un modèle disponible pour ton compte. |
+| Codex : « model is not supported » | Choisis un modèle de la liste avec `ai` ou l'onglet IA : ce sont ceux de ton compte. |
 | Les vidéos ne sont pas téléchargées | Volontaire : elles sont listées avec leur lien Moodle (`exclude.list_only_mimetypes`). |
+| Obsidian : « Unable to find a vault » | Le dossier n'a jamais été ouvert comme coffre : dans Obsidian, *Ouvrir un dossier comme coffre*, puis choisis le dossier des cours (ou celui qui contient `vault.dir`). |
+| Une note du coffre a disparu | Le pont supprime ses propres notes devenues sans objet (devoir retiré de Moodle, matière qui n'est plus suivie). Les tiennes, sans la propriété `genere_par: moodle-bridge`, ne sont jamais touchées. |
+| L'IA ne répond plus, ou je veux un autre modèle | Voir [Changer de modèle](ia.md#changer-de-modèle) : l'onglet IA de l'application, `Choisir-IA`, ou `ai test` pour un essai. |
 
 ## La synchronisation automatique ne tourne pas
 

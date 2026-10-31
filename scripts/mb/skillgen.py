@@ -54,10 +54,21 @@ def flags(cfg):
         "zotero": bool(cfg.data.get("zotero", {}).get("enabled")),
         "texts": cfg.texts_dir is not None,
         "index": cfg.index_path is not None,
+        "vault": cfg.vault_dir is not None,
         "mac": system.IS_MAC,
         "windows": system.IS_WINDOWS,
         "linux": system.IS_LINUX,
     }
+
+
+def ai_ui():
+    """Où l'utilisateur change lui-même d'IA, en plus de la commande `ai`."""
+    if system.IS_WINDOWS:
+        return f", ou un double-clic sur `{REPO / 'Choisir-IA.bat'}`"
+    if system.IS_MAC:
+        app = ", l'onglet IA de l'application" if "menubar" in FEATURES else ""
+        return f"{app}, ou un double-clic sur `{REPO / 'Choisir-IA.command'}`"
+    return ""
 
 
 def values(cfg):
@@ -72,6 +83,8 @@ def values(cfg):
         "STATE": str(cfg.state_path),
         "LOG": str(cfg.log_path),
         "INDEX": str(cfg.index_path) if cfg.index_path else "(aucun index configuré)",
+        "VAULT": str(cfg.vault_dir) if cfg.vault_dir else "(aucun coffre configuré)",
+        "AI_UI": ai_ui(),
         "TEXTS": str(cfg.texts_dir) if cfg.texts_dir else "(textes seulement dans l'état)",
         "REPO": str(REPO),
         "SITE": cfg.site,

@@ -42,6 +42,10 @@ struct Snapshot: Decodable, Identifiable {
     let history: [Run]
     let syncArgv: [String]
     let tokenArgv: [String]
+    // Absents des états écrits par une version plus ancienne du pont, ou d'une édition sans IA
+    let vaultDir: String?
+    let ai: AiCurrent?
+    let aiArgv: [String]?
 
     var id: String { slug }
 
@@ -220,6 +224,40 @@ struct RevealedFields: Decodable {
 }
 
 /// Couleur choisie par le modèle (« #RRGGBB »), et si elle est assez claire pour porter un texte noir.
+// MARK: - IA (réponse de `ai status --json`, ai.py)
+
+struct AiCurrent: Decodable {
+    let engine: String
+    let label: String
+    let model: String?
+    let modelIsDefault: Bool
+}
+
+struct AiModel: Decodable, Hashable {
+    let id: String?
+    let label: String
+    let hint: String
+}
+
+struct AiEngine: Decodable, Identifiable {
+    let id: String
+    let label: String
+    let hint: String
+    let path: String?
+    let installed: Bool
+    let loggedIn: Bool?
+    let models: [AiModel]
+    let install: String?
+
+    /// Claude Code et Codex se connectent à un compte ; les autres moteurs n'ont rien à connecter.
+    var needsAccount: Bool { id == "claude-cli" || id == "codex-cli" }
+}
+
+struct AiStatus: Decodable {
+    let current: AiCurrent
+    let engines: [AiEngine]
+}
+
 struct Tint {
     let red: Double, green: Double, blue: Double
 
@@ -330,6 +368,8 @@ final class Bridge: ObservableObject {
     @Published private(set) var notesBySlug: [String: NotesSnapshot] = [:]
     @Published private(set) var revealing: [String: Date] = [:]
     @Published private(set) var notesKicked: [String: Date] = [:]
+    @Published private(set) var aiStatus: [String: AiStatus] = [:]
+    @Published private(set) var aiBusy: Set<String> = []
 
     private var stamps: [String: Date] = [:]
     private var cache: [String: Snapshot] = [:]
@@ -701,6 +741,106 @@ final class Bridge: ObservableObject {
         }
     }
 
+    // IA : moteur et modèle par défaut (commande `ai` du pont)
+
+    static let aiDocs = "https://github.com/ArthurArctique/Moodle-Bridge/blob/main/docs/ia.md#changer-de-modèle"
+
+    /// Lance une commande du pont et renvoie sa sortie standard.
+    nonisolated static func capture(_ argv: [String]) -> (ok: Bool, output: Data) {
+        guard let program = argv.first else { return (false, Data()) }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: program)
+        process.arguments = Array(argv.dropFirst())
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return (false, Data()) }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return (process.terminationStatus == 0, data)
+    }
+
+    nonisolated static func decodeAI(_ data: Data) -> AiStatus? {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try? decoder.decode(AiStatus.self, from: data)
+    }
+
+    /// IA installées, connectées, et leurs modèles : quelques secondes (la commande interroge claude et codex).
+    func loadAI(_ snap: Snapshot) {
+        guard let argv = snap.aiArgv, !aiBusy.contains(snap.slug) else { return }
+        aiBusy.insert(snap.slug)
+        let slug = snap.slug
+        Task.detached {
+            let status = Bridge.decodeAI(Bridge.capture(argv + ["status", "--json"]).output)
+            await MainActor.run {
+                self.aiBusy.remove(slug)
+                if let status { self.aiStatus[slug] = status } else { self.message = "État de l'IA illisible." }
+            }
+        }
+    }
+
+    func setAI(_ snap: Snapshot, engine: String, model: String?) {
+        guard let argv = snap.aiArgv, !aiBusy.contains(snap.slug) else { return }
+        aiBusy.insert(snap.slug)
+        message = nil
+        let slug = snap.slug
+        var command = argv + ["set", "--engine", engine, "--json"]
+        if let model { command += ["--model", model] }
+        Task.detached {
+            let ok = Bridge.capture(command).ok
+            let status = Bridge.decodeAI(Bridge.capture(argv + ["status", "--json"]).output)
+            await MainActor.run {
+                self.aiBusy.remove(slug)
+                if let status { self.aiStatus[slug] = status }
+                if !ok { self.message = "Réglage refusé : essaie « Choisir dans le terminal… »." }
+            }
+        }
+    }
+
+    func testAI(_ snap: Snapshot) {
+        guard let argv = snap.aiArgv, !aiBusy.contains(snap.slug) else { return }
+        aiBusy.insert(snap.slug)
+        message = "Essai en cours…"
+        let slug = snap.slug
+        Task.detached {
+            let result = Bridge.capture(argv + ["test", "--json"])
+            let answer = (try? JSONSerialization.jsonObject(with: result.output)) as? [String: Any]
+            let text = (answer?["message"] as? String) ?? "Essai impossible."
+            await MainActor.run {
+                self.aiBusy.remove(slug)
+                self.message = (result.ok ? "✓ " : "✗ ") + text
+            }
+        }
+    }
+
+    /// Connexion à Claude Code ou Codex, ou choix pas à pas : dans un terminal, comme le jeton Moodle.
+    func aiInTerminal(_ snap: Snapshot, login engine: String? = nil) {
+        guard let argv = snap.aiArgv else { return }
+        let name = engine == nil ? "choisir-ia.command" : "connexion-ia.command"
+        let file = Self.root.appendingPathComponent(snap.slug).appendingPathComponent(name)
+        let args = engine.map { argv + ["login", "--engine", $0] } ?? argv
+        let command = args.map { "'" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" }.joined(separator: " ")
+        let title = engine == nil ? "choix de l'IA" : "connexion de l'IA"
+        let script = """
+        #!/bin/zsh
+        clear
+        echo "Moodle Bridge — \(title) pour \(snap.envName)"
+        echo
+        \(command)
+        echo
+        echo "Reviens dans le menu Moodle Bridge : l'onglet IA se met à jour."
+        read -k 1 "?Appuie sur une touche pour fermer cette fenêtre."
+        """
+        do {
+            try script.write(to: file, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+            NSWorkspace.shared.open(file)
+        } catch {
+            message = "Commande impossible à préparer : \(error.localizedDescription)"
+        }
+    }
+
     func open(_ file: BridgeFile) {
         guard let path = file.path else { return openURL(file.moodleUrl) }
         if FileManager.default.fileExists(atPath: path) {
@@ -727,12 +867,29 @@ final class Bridge: ObservableObject {
         guard let path = snap.indexPath else { return }
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "/-._~")
-        if NSWorkspace.shared.urlForApplication(withBundleIdentifier: "md.obsidian") != nil,
+        let obsidian = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "md.obsidian") != nil
+        if obsidian, Self.obsidianKnows(path),
            let encoded = path.addingPercentEncoding(withAllowedCharacters: allowed),
            let url = URL(string: "obsidian://open?path=\(encoded)") {
             NSWorkspace.shared.open(url)
         } else {
             NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            if obsidian, let dir = snap.vaultDir {
+                message = "Pour le lire dans Obsidian : « Ouvrir un dossier comme coffre » et choisir \(dir)."
+            }
+        }
+    }
+
+    /// Vrai si le fichier est dans un coffre qu'Obsidian connaît (sinon obsidian:// afficherait une erreur).
+    static func obsidianKnows(_ path: String) -> Bool {
+        let file = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/obsidian/obsidian.json")
+        guard let data = try? Data(contentsOf: file),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let vaults = json["vaults"] as? [String: [String: Any]] else { return false }
+        return vaults.values.contains { vault in
+            guard let root = vault["path"] as? String else { return false }
+            return path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
         }
     }
 
@@ -794,7 +951,7 @@ struct MenuBarLabel: View {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case files, upcoming, news, notes, runs
+    case files, upcoming, news, notes, runs, ai
 
     var id: String { rawValue }
 
@@ -805,6 +962,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .news: return "Annonces"
         case .notes: return "Notes"
         case .runs: return "Passages"
+        case .ai: return "IA"
         }
     }
 
@@ -826,7 +984,7 @@ struct TabBar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(Tab.allCases) { tab in
+            ForEach(Tab.allCases.filter { $0 != .ai || snap.aiArgv != nil }) { tab in
                 Button { selection = tab } label: {
                     HStack(spacing: 4) {
                         Text(tab.title).lineLimit(1).minimumScaleFactor(0.85)
@@ -858,7 +1016,7 @@ struct TabBar: View {
         case .upcoming: return snap.upcoming.filter { $0.at >= bridge.now.timeIntervalSince1970 - 3600 }.count
         case .news: return snap.announcements.count
         case .notes: return bridge.notes(for: snap).map(bridge.mysteries)
-        case .runs: return nil
+        case .runs, .ai: return nil
         }
     }
 }
@@ -887,6 +1045,7 @@ struct PanelView: View {
                         case .news: AnnouncementsList(snap: snap)
                         case .notes: NotesList(snap: snap)
                         case .runs: RunsList(snap: snap)
+                        case .ai: AiPanel(snap: snap)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1614,6 +1773,132 @@ struct GradeGauge: View {
     }
 }
 
+// MARK: - IA
+
+/// Onglet IA : choisir le moteur et le modèle par défaut du pont, se connecter, essayer.
+struct AiPanel: View {
+    @EnvironmentObject var bridge: Bridge
+    let snap: Snapshot
+
+    var body: some View {
+        let status = bridge.aiStatus[snap.slug]
+        let busy = bridge.aiBusy.contains(snap.slug)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles").foregroundStyle(.purple)
+                Text(summary(status)).font(.callout.weight(.medium)).lineLimit(1)
+                Spacer()
+                if busy { ProgressView().controlSize(.small) }
+                Button { bridge.loadAI(snap) } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.borderless)
+                    .disabled(busy)
+                    .help("Revérifier les IA installées et connectées")
+            }
+            if let status {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(status.engines) { engine in
+                        EngineRow(snap: snap, engine: engine, selected: engine.id == status.current.engine, busy: busy)
+                    }
+                }
+                if let engine = status.engines.first(where: { $0.id == status.current.engine }), !engine.models.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Modèle").font(.callout).foregroundStyle(.secondary)
+                        Picker("Modèle", selection: Binding(
+                            get: { status.current.model ?? engine.models.first?.id },
+                            set: { bridge.setAI(snap, engine: engine.id, model: $0) })) {
+                            ForEach(engine.models, id: \.self) { model in
+                                Text(model.hint.isEmpty ? model.label : "\(model.label) — \(model.hint)")
+                                    .tag(model.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .disabled(busy)
+                    }
+                }
+            } else if !busy {
+                Placeholder(text: "État de l'IA inconnu : clique sur ↻.")
+            }
+            HStack(spacing: 14) {
+                Button { bridge.testAI(snap) } label: { Label("Tester", systemImage: "checkmark.seal") }
+                    .disabled(busy || status?.current.engine == "none")
+                    .help("Un appel minimal à l'IA choisie")
+                Button { bridge.aiInTerminal(snap) } label: { Label("Dans le terminal…", systemImage: "terminal") }
+                    .help("Choix pas à pas, y compris une autre commande (Ollama…)")
+                Spacer()
+                Button { bridge.openURL(Bridge.aiDocs) } label: { Label("Aide", systemImage: "questionmark.circle") }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+            Text("L'IA range les fichiers ambigus, résume les annonces longues et habille les notes mystère. "
+                 + "Le coffre Obsidian et la synchronisation n'en ont pas besoin.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 6)
+        .onAppear { if status == nil { bridge.loadAI(snap) } }
+    }
+
+    private func summary(_ status: AiStatus?) -> String {
+        guard let current = status?.current ?? snap.ai else { return "IA" }
+        guard current.engine != "none" else { return "Aucune IA" }
+        return current.label + (current.model.map { " · \($0)" } ?? "")
+    }
+}
+
+struct EngineRow: View {
+    @EnvironmentObject var bridge: Bridge
+    let snap: Snapshot
+    let engine: AiEngine
+    let selected: Bool
+    let busy: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            RowButton(action: choose) {
+                HStack(spacing: 8) {
+                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(engine.label).font(.callout.weight(selected ? .semibold : .regular))
+                        Text(engine.hint).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                    if let chip { Chip(text: chip.0, symbol: chip.1, tint: chip.2) }
+                }
+            }
+            .disabled(busy)
+            if engine.needsAccount && engine.installed && engine.loggedIn == false {
+                Button("Se connecter…") { bridge.aiInTerminal(snap, login: engine.id) }
+                    .controlSize(.small)
+                    .help("Ouvre un terminal pour connecter \(engine.label) à ton compte")
+            } else if engine.needsAccount && !engine.installed {
+                Button("Installer…") { bridge.openURL(Bridge.aiDocs) }
+                    .controlSize(.small)
+                    .help(engine.install ?? "")
+            }
+        }
+    }
+
+    private var chip: (String, String, Color)? {
+        guard engine.needsAccount else { return nil }
+        if !engine.installed { return ("non installé", "xmark.circle", .gray) }
+        switch engine.loggedIn {
+        case true?: return ("connecté", "checkmark.circle.fill", .green)
+        case false?: return ("non connecté", "exclamationmark.circle", .orange)
+        default: return nil
+        }
+    }
+
+    private func choose() {
+        if selected { return }
+        if engine.id == "command" { return bridge.aiInTerminal(snap) }  // la commande se saisit au clavier
+        if engine.needsAccount && !engine.installed { return bridge.openURL(Bridge.aiDocs) }
+        bridge.setAI(snap, engine: engine.id, model: engine.models.first?.id)
+        if engine.needsAccount && engine.loggedIn == false { bridge.aiInTerminal(snap, login: engine.id) }
+    }
+}
+
 struct Placeholder: View {
     let text: String
 
@@ -1633,8 +1918,13 @@ struct Footer: View {
     var body: some View {
         HStack(spacing: 14) {
             if snap.indexPath != nil {
-                Button { bridge.openIndex(snap) } label: { Label("Index", systemImage: "doc.text") }
-                    .help("Ouvrir l'index Moodle (Obsidian)")
+                if snap.vaultDir != nil {
+                    Button { bridge.openIndex(snap) } label: { Label("Coffre", systemImage: "books.vertical") }
+                        .help("Ouvrir le coffre Obsidian de Moodle (page Accueil)")
+                } else {
+                    Button { bridge.openIndex(snap) } label: { Label("Index", systemImage: "doc.text") }
+                        .help("Ouvrir l'index Moodle (Obsidian)")
+                }
             }
             Button { bridge.openFolder(snap) } label: { Label("Dossier", systemImage: "folder") }
             Button { bridge.openURL(snap.site + "/my/") } label: { Label("Moodle", systemImage: "safari") }

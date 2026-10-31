@@ -185,7 +185,9 @@ class WizardTest(unittest.TestCase):
         self.assertEqual(done["pending"], ["token"])
         self.assertIn("token --config", done["next"])
         self.assertEqual(data["site"], SITE)
-        self.assertEqual(data["index"]["path"], "Moodle.md")
+        self.assertEqual(data["vault"]["dir"], "Tableau de bord")
+        self.assertIsNone(data["index"]["path"])
+        self.assertEqual(data["texts"]["dir"], ".moodle-bridge/textes")
         self.assertEqual(data["default_mode"], "mirror")
         self.assertTrue(data["keychain_service"].startswith("moodle-bridge:"))
 

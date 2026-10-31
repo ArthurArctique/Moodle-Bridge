@@ -49,7 +49,7 @@ Une destination du modèle est acceptée seulement si :
 - c'est un dossier existant, ou elle correspond entièrement à l'un des `new_dir_patterns` (par défaut `CM/CM07`, `TD/TD02`, `TP/TP11`, `Ressources`, `Projet`) ;
 - la confiance atteint `min_confidence` (0,8 par défaut).
 
-Sinon le fichier va dans la boîte d'attente, avec la proposition refusée et sa raison, visibles dans l'index.
+Sinon le fichier va dans la boîte d'attente, avec la proposition refusée et sa raison, visibles dans le coffre (accueil et note de la matière).
 
 ## Corriger un placement
 

@@ -11,7 +11,12 @@ import sys
 import time
 from pathlib import Path
 
-from . import schedule, summaries, util
+from . import schedule, summaries, util, vault
+
+try:
+    from . import ai
+except ImportError:  # édition sans IA
+    ai = None
 from .index import INITIAL_IMPORT_THRESHOLD, entry_code, recent_announcements, upcoming
 
 VERSION = 1
@@ -89,7 +94,10 @@ def build(cfg, state, now=None, running=False, scheduled=False, previous=None):
         "version": VERSION, "generated_at": now, "slug": cfg.slug,
         "env_name": cfg.env_root.name, "env_root": str(cfg.env_root), "config": str(cfg.path),
         "site": cfg.site, "sitename": remote.get("sitename"),
-        "index_path": str(cfg.index_path) if cfg.index_path else None, "log_path": str(cfg.log_path),
+        # Ce que « Ouvrir dans Obsidian » ouvre : l'accueil du coffre, sinon l'ancien index
+        "index_path": str(cfg.vault_dir / f"{vault.HOME}.md") if cfg.vault_dir else (
+            str(cfg.index_path) if cfg.index_path else None),
+        "log_path": str(cfg.log_path),
         "launchd_label": schedule.label(cfg), "schedule_installed": schedule.installed(cfg),
         "interval_minutes": cfg.interval_minutes,
         # Pendant un passage : l'application vérifie que ce processus vit encore
@@ -114,6 +122,10 @@ def build(cfg, state, now=None, running=False, scheduled=False, previous=None):
         "history": [_run(h) for h in reversed(state.get("history", [])[-MAX_RUNS:])],
         "sync_argv": _argv(cfg, "sync") + ["--quiet"],
         "token_argv": _argv(cfg, "token"),
+        # Onglet IA : réglage actuel (lu dans la configuration, sans lancer de commande) et commande à appeler
+        "vault_dir": str(cfg.vault_dir) if cfg.vault_dir else None,
+        "ai": ai.current(cfg) if ai else None,
+        "ai_argv": _argv(cfg, "ai") if ai else None,
     }
 
 
