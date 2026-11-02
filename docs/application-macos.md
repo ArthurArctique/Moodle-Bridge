@@ -19,7 +19,7 @@ Une petite icône dans la barre des menus. Un clic ouvre un panneau. Une fenêtr
   - en échec : Moodle injoignable ou jeton expiré, la raison est dans le panneau.
 - **Documents** : les derniers arrivés et le dossier où ils ont été rangés, un clic pour les ouvrir.
 - **Échéances** : devoirs et événements à venir.
-- **Annonces** : un clic affiche le résumé (ou le texte d'une annonce courte), un autre ouvre l'annonce sur Moodle.
+- **Annonces** : un clic affiche le résumé (ou le texte d'une annonce courte), un autre ouvre l'annonce sur Moodle. Le compteur de l'onglet ne montre que les annonces pas encore affichées : il disparaît dès que tu as ouvert l'onglet.
 - **Notes** (si activées) : une nouvelle note arrive en **mystère**, avec un emoji, une couleur et une énigme. Sa valeur ne s'affiche qu'au clic sur « Découvrir ».
 - **IA** : l'IA utilisée et son modèle, à changer d'un clic. Voir [Changer de modèle](ia.md#changer-de-modèle).
 - **Historique** des derniers passages et bouton **Synchroniser**, qui lance tout de suite la tâche planifiée.

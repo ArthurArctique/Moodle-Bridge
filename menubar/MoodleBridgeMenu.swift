@@ -654,6 +654,26 @@ final class Bridge: ObservableObject {
 
     var totalUnread: Int { snapshots.reduce(0) { $0 + unread($1) } }
 
+    // Annonces lues : celles déjà affichées dans l'onglet Annonces, que son compteur ne compte plus
+
+    private var readNews: [String: [String]] {
+        UserDefaults.standard.dictionary(forKey: "readNews") as? [String: [String]] ?? [:]
+    }
+
+    func unreadNews(_ snap: Snapshot) -> Int {
+        let read = Set(readNews[snap.slug] ?? [])
+        return snap.announcements.filter { !read.contains($0.id) }.count
+    }
+
+    /// Ne retient que les annonces encore listées : la liste ne couvre que les derniers jours.
+    func markNewsRead(_ snap: Snapshot) {
+        guard unreadNews(snap) > 0 else { return }
+        var read = readNews
+        read[snap.slug] = snap.announcements.map(\.id)
+        UserDefaults.standard.set(read, forKey: "readNews")
+        objectWillChange.send()
+    }
+
     func panelOpened() {
         for snap in snapshots where highlightSince[snap.slug] == nil {
             highlightSince[snap.slug] = seenDates[snap.slug] ?? .infinity
@@ -1034,7 +1054,7 @@ struct TabBar: View {
         switch tab {
         case .files: return bridge.unread(snap)
         case .upcoming: return snap.upcoming.filter { $0.at >= bridge.now.timeIntervalSince1970 - 3600 }.count
-        case .news: return snap.announcements.count
+        case .news: return bridge.unreadNews(snap)
         case .notes: return bridge.notes(for: snap).map(bridge.mysteries)
         case .runs, .ai: return nil
         }
@@ -1413,6 +1433,8 @@ struct AnnouncementsList: View {
             }
             if snap.announcements.isEmpty { Placeholder(text: "Aucune annonce ces derniers jours.") }
         }
+        // Affichées, donc lues : y compris celles qui arrivent pendant que l'onglet est ouvert
+        .task(id: snap.announcements.map(\.id)) { bridge.markNewsRead(snap) }
     }
 }
 
