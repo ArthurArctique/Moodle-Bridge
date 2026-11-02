@@ -221,6 +221,129 @@ class WizardTest(unittest.TestCase):
                 wizard.run({"site": SITE, "env": tmp})
 
 
+class AppSetupTest(unittest.TestCase):
+    """Ce dont la fenêtre d'installation de l'application a besoin : étapes partielles, JSON seul, connexion."""
+    PUBLIC = WizardTest.PUBLIC
+
+    def _client(self):
+        client = mock.Mock()
+        client.call.side_effect = lambda fn, **kw: (
+            {"userid": 7} if fn == "core_webservice_get_site_info"
+            else [{"id": 12, "shortname": "DEF", "fullname": "Zoologie"}, {"id": 11, "shortname": "ABC", "fullname": "Algèbre"}])
+        return client
+
+    def _cli(self, argv, stdin=""):
+        import moodle_bridge
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(sys, "stdin", io.StringIO(stdin)), mock.patch.object(sys, "stdout", out), \
+                mock.patch.object(sys, "stderr", err):
+            code = moodle_bridge.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_until_config_stops_before_connection(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(api, "public_config", return_value=self.PUBLIC), \
+                mock.patch.object(wizard, "check_token", return_value=None):
+            done = wizard.run({"site": SITE, "env": tmp, "engine": "none", "until": "config"})
+            data = json.loads((Path(tmp) / ".moodle-bridge" / "config.json").read_text("utf-8"))
+        self.assertEqual((done["login"], done["token_ok"], done["sitename"]), ("password", False, "Test"))
+        self.assertEqual(data["courses"], {})
+
+    def test_until_courses_lists_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(api, "public_config", return_value=self.PUBLIC), \
+                mock.patch.object(wizard, "check_token", return_value=("Étudiant", "Test")), \
+                mock.patch.object(credentials, "read_token", return_value="d" * 32), \
+                mock.patch.object(api, "Client", return_value=self._client()):
+            done = wizard.run({"site": SITE, "env": tmp, "engine": "none", "until": "courses"})
+            data = json.loads((Path(tmp) / ".moodle-bridge" / "config.json").read_text("utf-8"))
+        self.assertEqual([c["fullname"] for c in done["courses"]], ["Algèbre", "Zoologie"])
+        self.assertEqual(data["courses"], {})
+
+    def test_until_courses_requires_connection(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(api, "public_config", return_value=self.PUBLIC), \
+                mock.patch.object(wizard, "check_token", return_value=None):
+            with self.assertRaises(wizard.Abort):
+                wizard.run({"site": SITE, "env": tmp, "until": "courses"})
+
+    def test_probe_describes_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(Path, "home", return_value=Path(tmp)), \
+                mock.patch.object(wizard.system, "obsidian_vaults", return_value=[Path(tmp) / "Coffre"]):
+            if wizard.ai:
+                with mock.patch.object(wizard.ai, "engines", return_value=[{"id": "none"}]):
+                    found = wizard.probe()
+            else:
+                found = wizard.probe()
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+        self.assertEqual(found["default_env"], str(Path(tmp) / "Moodle"))
+        self.assertEqual(found["vaults"], [str(Path(tmp) / "Coffre")])
+
+    def test_answers_mode_prints_only_the_final_json(self):
+        def noisy(answers, actions=None):
+            print("  ✓ étape bavarde")
+            return {"config": "c", "pending": [], "steps": ["sync"]}
+        with mock.patch.object(wizard, "run", noisy):
+            code, out, err = self._cli(["init", "--answers", "-"], stdin="{}")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["steps"], ["sync"])
+        self.assertIn("étape bavarde", err)
+
+    def test_check_site_normalizes_and_reports_errors_as_json(self):
+        import urllib.error
+        with mock.patch.object(api, "public_config", return_value=self.PUBLIC) as public:
+            code, out, _ = self._cli(["check-site", "--site", "moodle.test/my/", "--json"])
+        public.assert_called_once_with(SITE)
+        self.assertEqual((code, json.loads(out)["site"], json.loads(out)["login"]), (0, SITE, "password"))
+        with mock.patch.object(api, "public_config", side_effect=urllib.error.URLError("introuvable")):
+            code, out, _ = self._cli(["check-site", "--site", "moodle.test", "--json"])
+        self.assertEqual(code, 1)
+        self.assertIn("introuvable", json.loads(out)["error"])
+
+    def _from_app(self, request, who=("Étudiant", "Test")):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = make_config(tmp, {"keychain_service": "moodle-bridge:test"})
+            with mock.patch.object(credentials, "store_token") as store, \
+                    mock.patch.object(wizard, "check_token", return_value=who):
+                code, out, err = self._cli(["token", "--config", str(cfg.path), "--from-app"], json.dumps(request))
+        return code, json.loads(out), store, out + err
+
+    def _payload(self, passport, token):
+        import base64
+        signature = credentials.expected_signature(SITE, passport)
+        return "moodlemobile://token=" + base64.b64encode(f"{signature}:::{token}".encode()).decode()
+
+    def test_token_from_browser_checks_the_signature(self):
+        token = "e" * 32
+        code, answer, store, printed = self._from_app(
+            {"method": "browser", "passport": "abc", "payload": self._payload("abc", token)})
+        self.assertEqual((code, answer["ok"], answer["user"]), (0, True, "Étudiant"))
+        store.assert_called_once_with("moodle-bridge:test", token)
+        self.assertNotIn(token, printed)
+        code, answer, store, _ = self._from_app(
+            {"method": "browser", "passport": "autre", "payload": self._payload("abc", token)})
+        self.assertEqual((code, answer["ok"]), (1, False))
+        self.assertIn("signature", answer["error"])
+        store.assert_not_called()
+
+    def test_token_from_key_and_password(self):
+        code, answer, store, _ = self._from_app({"method": "key", "token": "F" * 32})
+        self.assertTrue(answer["ok"])
+        store.assert_called_once_with("moodle-bridge:test", "f" * 32)
+        code, answer, store, _ = self._from_app({"method": "key", "token": "court"})
+        self.assertFalse(answer["ok"])
+        store.assert_not_called()
+        with mock.patch.object(credentials, "login_with_password", return_value="a" * 32) as login:
+            code, answer, store, printed = self._from_app({"method": "password", "username": "u", "password": "secret"})
+        login.assert_called_once_with(SITE, "u", "secret")
+        self.assertTrue(answer["ok"])
+        self.assertNotIn("secret", printed)
+
+    def test_token_refused_by_moodle(self):
+        code, answer, _, _ = self._from_app({"method": "key", "token": "a" * 32}, who=None)
+        self.assertEqual((code, answer["ok"]), (1, False))
+
+
 @unittest.skipIf(skillgen is None, "édition sans skill")
 class SkillTest(unittest.TestCase):
     def test_render_nested_conditions(self):

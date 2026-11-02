@@ -266,6 +266,16 @@ def expected_signature(site, passport):
     return hashlib.md5((site.rstrip("/") + passport).encode()).hexdigest()
 
 
+def store_from_launch(site, service, passport, payload):
+    """Range le jeton d'une réponse de launch.php reçue par l'application, après en avoir vérifié la signature."""
+    signature, token, problem = parse_launch_payload(payload)
+    if problem:
+        raise LoginError(problem)
+    if signature != expected_signature(site, passport):
+        raise LoginError("signature inattendue : cette réponse vient d'une autre tentative de connexion. Recommence.")
+    store_token(service, token)
+
+
 def devtools_shortcut():
     return "Cmd+Option+I" if system.IS_MAC else "F12 (ou Ctrl+Maj+I)"
 

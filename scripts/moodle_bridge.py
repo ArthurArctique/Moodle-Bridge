@@ -4,8 +4,8 @@
 Première installation : `python3 install.py` à la racine du dépôt (ou `moodle_bridge.py init`).
 
 Exemples :
-  moodle_bridge.py init [--answers réponses.json]
-  moodle_bridge.py check-site --site https://moodle.exemple.fr
+  moodle_bridge.py init [--answers réponses.json | --probe]
+  moodle_bridge.py check-site --site https://moodle.exemple.fr [--json]
   moodle_bridge.py token  --config <env>/.moodle-bridge/config.json [--method password|browser|key]
   moodle_bridge.py sync   --config <env>/.moodle-bridge/config.json [--dry-run]
   moodle_bridge.py status --config <env>/.moodle-bridge/config.json [--json]
@@ -13,11 +13,16 @@ Exemples :
 """
 
 import argparse
+import contextlib
 import html
 import importlib
 import json
+import os
 import re
+import secrets
+import subprocess
 import sys
+import traceback
 import time
 import urllib.error
 from collections import Counter
@@ -57,6 +62,22 @@ def load_config(args):
         sys.exit(f"Configuration : {exc}")
 
 
+@contextlib.contextmanager
+def stdout_to_stderr():
+    """Sortie des étapes, et des commandes qu'elles lancent, vers la sortie d'erreur : la sortie standard ne porte
+    plus que le JSON final, que l'application lit pendant qu'elle affiche la progression."""
+    sys.stdout.flush()
+    saved = os.dup(1)
+    os.dup2(2, 1)
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            yield
+    finally:
+        sys.stderr.flush()
+        os.dup2(saved, 1)
+        os.close(saved)
+
+
 def make_client(cfg):
     try:
         return api.Client(cfg.site, credentials.read_token(cfg.data["keychain_service"]))
@@ -67,8 +88,19 @@ def make_client(cfg):
 # ---------------------------------------------------------------- commandes
 
 def cmd_check_site(args):
-    data = api.public_config(args.site)
+    site = wizard.normalize_site(args.site)
+    try:
+        if not site:
+            raise ValueError("adresse vide")
+        data = api.public_config(site)
+    except (urllib.error.URLError, OSError, ValueError, api.MoodleError) as exc:
+        message = f"{site or args.site} ne répond pas comme un Moodle : {getattr(exc, 'reason', None) or exc}"
+        print(json.dumps({"site": site, "error": message}, ensure_ascii=False, indent=2) if args.json else message)
+        return 1
     if args.json:
+        data = dict(data, site=(data.get("wwwroot") or site).rstrip("/"),
+                    usable=bool(data.get("enablewebservices") and data.get("enablemobilewebservice")),
+                    login=wizard.LOGIN_HINTS.get(data.get("typeoflogin"), "browser"))
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
     print(f"Site : {data.get('sitename')} ({data.get('wwwroot')})")
@@ -91,19 +123,30 @@ METHODS = {"password": "identifiant et mot de passe Moodle", "browser": "par le 
            "key": "clé de la page « Clés de sécurité »"}
 
 
+def login_method(site):
+    """Méthode de connexion conseillée d'après le type de connexion de l'appli mobile du site."""
+    try:
+        return wizard.LOGIN_HINTS.get(api.public_config(site).get("typeoflogin"), "browser")
+    except (urllib.error.URLError, OSError, ValueError, api.MoodleError):
+        return "browser"
+
+
 def cmd_token(args):
-    """Première connexion ou renouvellement du jeton ; toujours lancée par l'utilisateur dans son terminal."""
+    """Première connexion ou renouvellement du jeton ; lancée par l'utilisateur dans son terminal, ou par la fenêtre
+    de l'application (`--begin`, puis `--from-app`), où il se connecte lui-même."""
     cfg = load_config(args)
     service = cfg.data["keychain_service"]
     if args.forget:
         print("Jeton supprimé." if credentials.delete_token(service) else "Aucun jeton enregistré.")
         return 0
-    method = args.method
-    if not method:
-        try:
-            method = wizard.LOGIN_HINTS.get(api.public_config(cfg.site).get("typeoflogin"), "browser")
-        except (urllib.error.URLError, OSError, ValueError, api.MoodleError):
-            method = "browser"
+    if args.begin:
+        passport = secrets.token_hex(8)
+        print(json.dumps({"site": cfg.site, "method": login_method(cfg.site), "passport": passport,
+                          "url": credentials.launch_url(cfg.site, passport)}, ensure_ascii=False, indent=2))
+        return 0
+    if args.from_app:
+        return token_from_app(cfg)
+    method = args.method or login_method(cfg.site)
     print(f"Connexion à {cfg.site} — {METHODS[method]} (autre méthode : --method {'|'.join(METHODS)})\n")
     if not wizard.obtain_token(cfg, method, wizard.Prompter()):
         return 1
@@ -115,23 +158,79 @@ def cmd_token(args):
     return 0
 
 
+def token_from_app(cfg):
+    """Connexion faite dans la fenêtre de l'application, demande en JSON sur l'entrée standard :
+    {"method": "browser", "passport", "payload"}, {"method": "password", "username", "password"} ou
+    {"method": "key", "token"}. Le jeton et le mot de passe ne sont jamais affichés ni écrits ailleurs que dans le
+    coffre du système ; la réponse dit seulement si Moodle accepte la connexion."""
+    service = cfg.data["keychain_service"]
+
+    def answer(ok, **fields):
+        print(json.dumps(dict(fields, ok=ok), ensure_ascii=False, indent=2))
+        return 0 if ok else 1
+
+    try:
+        request = json.load(sys.stdin)
+        method = request.get("method")
+        if method == "browser":
+            credentials.store_from_launch(cfg.site, service, request.get("passport") or "", request.get("payload") or "")
+        elif method == "password":
+            username, password = (request.get("username") or "").strip(), request.get("password") or ""
+            if not username or not password:
+                raise credentials.LoginError("identifiant et mot de passe requis")
+            credentials.store_token(service, credentials.login_with_password(cfg.site, username, password))
+        elif method == "key":
+            token = (request.get("token") or "").strip().lower()
+            if not credentials.TOKEN_RE.fullmatch(token):
+                raise credentials.LoginError("ce n'est pas une clé de 32 caractères hexadécimaux")
+            credentials.store_token(service, token)
+        else:
+            raise credentials.LoginError(f"méthode inconnue : {method}")
+    except credentials.LoginError as exc:
+        return answer(False, error=str(exc))
+    except subprocess.CalledProcessError:
+        return answer(False, error=f"enregistrement refusé : {credentials.where(service)}")
+    except OSError as exc:  # site injoignable
+        return answer(False, error=f"{cfg.site} injoignable : {exc}")
+    except (ValueError, AttributeError):
+        return answer(False, error="demande illisible")
+    try:
+        who = wizard.check_token(cfg)
+    except (OSError, ValueError, api.MoodleError) as exc:
+        return answer(False, error=f"jeton enregistré, mais pas vérifié : {exc}")
+    if not who:
+        return answer(False, error="Moodle refuse ce jeton : recommence la connexion.")
+    return answer(True, user=who[0], sitename=who[1] or cfg.site)
+
+
 def cmd_init(args):
     """Assistant d'installation (interactif, ou piloté par un fichier de réponses)."""
+    if args.probe:
+        print(json.dumps(wizard.probe(), ensure_ascii=False, indent=2))
+        return 0
     answers = None
     if args.answers:
         source = sys.stdin if args.answers == "-" else open(args.answers, encoding="utf-8")
         with source:
             answers = json.load(source)
-    try:
-        done = wizard.run(answers, actions=install_actions())
-    except wizard.Abort as exc:
-        if answers is not None:
-            print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2))
-        else:
+    if answers is None:
+        try:
+            wizard.run(None, actions=install_actions())
+        except wizard.Abort as exc:
             print(f"\n{exc}")
+            return 1
+        return 0
+    try:
+        with stdout_to_stderr():
+            done = wizard.run(answers, actions=install_actions())
+    except wizard.Abort as exc:
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2))
         return 1
-    if answers is not None:
-        print(json.dumps(done, ensure_ascii=False, indent=2))
+    except Exception as exc:  # noqa: BLE001 — réponse lisible pour l'agent ou l'application, détail sur stderr
+        traceback.print_exc()
+        print(json.dumps({"error": f"{type(exc).__name__} : {exc}"}, ensure_ascii=False, indent=2))
+        return 1
+    print(json.dumps(done, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -721,6 +820,7 @@ def main(argv=None):
 
     p = sub.add_parser("init", help="assistant d'installation (première fois, ou mise à jour d'une installation)")
     p.add_argument("--answers", help="réponses en JSON (fichier, ou - pour l'entrée standard) : mode non interactif")
+    p.add_argument("--probe", action="store_true", help="décrire la machine en JSON (Python, coffres, IA), sans rien écrire")
     p.set_defaults(func=cmd_init)
     p = sub.add_parser("check-site", help="vérifier qu'un Moodle expose l'API de l'appli mobile")
     p.add_argument("--site", required=True)
@@ -736,6 +836,9 @@ def main(argv=None):
     p = with_config("token", cmd_token, "se connecter à Moodle et enregistrer le jeton (interactif)")
     p.add_argument("--method", choices=sorted(METHODS), help="défaut : selon le type de connexion du site")
     p.add_argument("--forget", action="store_true", help="supprimer le jeton enregistré")
+    p.add_argument("--begin", action="store_true", help="application : adresse de connexion par le navigateur, en JSON")
+    p.add_argument("--from-app", action="store_true",
+                   help="application : connexion reçue en JSON sur l'entrée standard (jamais en argument)")
     p = with_config("courses", cmd_courses, "lister les cours et leur destination")
     p.add_argument("--add-all", action="store_true", help="suivre tous les cours pas encore configurés")
     p.add_argument("--mode", choices=["mirror", "classify"], help="mode des cours ajoutés (défaut : default_mode)")

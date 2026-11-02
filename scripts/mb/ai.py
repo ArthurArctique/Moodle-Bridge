@@ -116,22 +116,28 @@ def overrides(cfg):
             for name, section in sections.items() if any(section.get(k) for k in ("engine", "model", "command"))}
 
 
-def status(cfg, with_models=True):
-    now = current(cfg)
-    engines = []
+def engines(now=None, with_models=True):
+    """Moteurs proposés, installés ou non, connectés ou non, avec leurs modèles ; `now` : le réglage actuel, s'il existe."""
+    now = now or {"engine": "none", "model": None, "command": None}
+    found = []
     for engine in ("claude-cli", "codex-cli"):
         path = locate(engine, now["command"] if now["engine"] == engine else None)
         listed = models(engine, path) if with_models else []
         if now["engine"] == engine and now["model"] and all(m["id"] != now["model"] for m in listed):
             listed.append({"id": now["model"], "label": now["model"], "hint": "réglage actuel"})
-        engines.append({"id": engine, "label": LABELS[engine], "hint": HINTS[engine], "path": path,
-                        "installed": bool(path), "logged_in": logged_in(engine, path), "models": listed,
-                        "install": INSTALL[engine]})
-    engines.append({"id": "command", "label": LABELS["command"], "hint": HINTS["command"], "path": None,
-                    "installed": now["engine"] == "command", "logged_in": None, "models": [], "install": None})
-    engines.append({"id": "none", "label": LABELS["none"], "hint": HINTS["none"], "path": None,
-                    "installed": True, "logged_in": None, "models": [], "install": None})
-    return {"config": str(cfg.path), "current": now, "overrides": overrides(cfg), "engines": engines}
+        found.append({"id": engine, "label": LABELS[engine], "hint": HINTS[engine], "path": path,
+                      "installed": bool(path), "logged_in": logged_in(engine, path), "models": listed,
+                      "install": INSTALL[engine]})
+    found.append({"id": "command", "label": LABELS["command"], "hint": HINTS["command"], "path": None,
+                  "installed": now["engine"] == "command", "logged_in": None, "models": [], "install": None})
+    found.append({"id": "none", "label": LABELS["none"], "hint": HINTS["none"], "path": None,
+                  "installed": True, "logged_in": None, "models": [], "install": None})
+    return found
+
+
+def status(cfg, with_models=True):
+    now = current(cfg)
+    return {"config": str(cfg.path), "current": now, "overrides": overrides(cfg), "engines": engines(now, with_models)}
 
 
 def apply(config_path, engine, model=None, command=None):

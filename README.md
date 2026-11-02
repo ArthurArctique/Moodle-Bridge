@@ -41,6 +41,20 @@ L'agent trouve ses consignes dans le dépôt ([`AGENTS.md`](AGENTS.md)). Il te p
 
 Pendant qu'il travaille, tu pourrais lire la suite de ce README. Quelqu'un a passé des soirées à l'écrire, pour toi. Mais fais comme tu veux.
 
+## Sur Mac : télécharge l'application
+
+Pas de terminal, pas de `git` : l'application s'installe comme n'importe quelle autre, puis une fenêtre te guide pas à pas.
+
+**[Télécharger Moodle Bridge pour macOS](../../releases/latest/download/Moodle-Bridge-macOS.zip)** (macOS 13 ou plus récent, Apple Silicon ou Intel)
+
+1. Ouvre le zip et glisse **Moodle Bridge** dans le dossier **Applications**.
+2. Ouvre-la. La première fois, macOS refuse : l'application n'est pas signée par un compte développeur Apple (payant). Va dans **Réglages Système › Confidentialité et sécurité**, puis clique sur **Ouvrir quand même** en bas de la page.
+3. Suis la fenêtre : ton Moodle, le dossier des cours, une IA si tu veux, la connexion, les cours à suivre. C'est tout.
+
+La connexion par la page de ton établissement (CAS, ENT…) se fait dans le navigateur, et le jeton revient tout seul dans l'application : pas besoin des outils de développement. Il faut Python 3.9 ou plus récent ; s'il manque, la fenêtre propose d'installer les outils d'Apple, qui le fournissent.
+
+Pour mettre à jour, remplace l'application par la nouvelle version : tes réglages et tes cours sont conservés. Détails : [docs/application-macos.md](docs/application-macos.md).
+
 ## Éditions
 
 Le dépôt a plusieurs branches. Choisis la tienne :
@@ -249,7 +263,11 @@ L'application affiche dans la barre des menus :
 - un onglet **IA** pour changer d'IA ou de modèle, et s'y connecter ;
 - un bouton « Synchroniser », et un bouton « Coffre » qui ouvre l'accueil dans Obsidian.
 
-Elle est compilée sur ta machine pendant l'installation, ce qui demande les outils de développement d'Apple : `xcode-select --install`. Voir [docs/application-macos.md](docs/application-macos.md).
+Deux façons de l'avoir :
+- **la télécharger**, déjà compilée, avec sa fenêtre d'installation : voir [Sur Mac : télécharge l'application](#sur-mac--télécharge-lapplication) ;
+- **la compiler** pendant `install.py`, ce qui demande les outils de développement d'Apple (`xcode-select --install`).
+
+Si le jeton expire, « Renouveler le jeton… » ouvre une fenêtre de connexion. Voir [docs/application-macos.md](docs/application-macos.md).
 
 ## Sécurité et vie privée
 

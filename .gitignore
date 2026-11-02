@@ -15,3 +15,5 @@ desktop.ini
 # Application compilée
 *.app/
 build/
+# Release (menubar/release/make_release.py)
+dist/

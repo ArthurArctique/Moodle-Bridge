@@ -23,9 +23,19 @@ C'est ce qu'il attend s'il te demande de l'installer, ou s'il t'ouvre dans ce d�
 ## Modifier le code du pont
 
 - `scripts/moodle_bridge.py` : la ligne de commande. `scripts/mb/` : les modules.
-- `menubar/` : l'application macOS (SwiftUI).
+- `menubar/` : l'application macOS (SwiftUI). `Setup.swift` : sa fenêtre d'installation et de reconnexion, qui pilote `init --probe`, `init --answers` (avec `until`) et `token --begin` / `--from-app`.
 - `skill/` : le guide d'installation et le modèle du skill installé.
 - `docs/` : la documentation utilisateur.
 - Tests : `python3 -I -m unittest discover tests`.
 - Animation du README : `python3 menubar/demo/make_gif.py`.
 - `main` contient tout. Les branches `cli-ia`, `outil` et `skill` en sont des éditions réduites.
+
+## Publier une version (release macOS)
+
+La release est fabriquée par GitHub Actions (`.github/workflows/release.yml`) : tests, puis `menubar/release/make_release.py`. Le script produit `Moodle-Bridge-macOS.zip` : une application universelle avec le pont embarqué, signée localement, sans notarisation.
+
+1. Essai, facultatif : onglet Actions › Release macOS › *Run workflow*. Le zip est disponible comme artefact du lancement, sans release. En local : `python3 -I menubar/release/make_release.py`, qui écrit dans `dist/`.
+2. Passe la version dans `scripts/mb/__init__.py` (`__version__`), puis commite.
+3. Pose le tag correspondant et pousse-le : `git tag v1.2.0 && git push origin v1.2.0`. Le workflow refuse un tag qui ne correspond pas à `__version__`.
+
+Le tag déclenche une publication : ne le pose et ne le pousse qu'à la demande explicite du mainteneur.

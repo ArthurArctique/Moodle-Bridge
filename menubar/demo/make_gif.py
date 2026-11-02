@@ -30,7 +30,7 @@ def build(tmp):
     arch = platform.machine() or "arm64"
     command = [menubar._swiftc(), "-parse-as-library", "-swift-version", "5", "-D", "DEMO",
                "-target", f"{arch}-apple-macos{menubar.MIN_MACOS}",
-               str(menubar.SOURCE), str(HERE / "Demo.swift"), "-o", str(binary)]
+               *map(str, menubar.SOURCES), str(HERE / "Demo.swift"), "-o", str(binary)]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
         sys.exit(result.stderr.strip()[-3000:] or "swiftc a échoué")

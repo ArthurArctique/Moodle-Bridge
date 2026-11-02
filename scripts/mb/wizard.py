@@ -5,21 +5,30 @@ Deux façons de l'utiliser :
 - non interactive (`init --answers réponses.json`), pour un agent qui a posé les questions dans sa conversation.
   Une réponse absente prend sa valeur par défaut ; la connexion à Moodle reste toujours à faire par
   l'utilisateur, dans son propre terminal (commande `token`).
+
+La fenêtre d'installation de l'application macOS utilise le mode non interactif en trois temps : `"until":
+"config"` (configuration écrite, avant la connexion), `"until": "courses"` (liste des cours, rien d'écrit),
+puis l'installation complète. `probe()` lui décrit la machine.
 """
 
 import getpass
 import json
 import re
+import sys
 import urllib.error
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import FEATURES, api, config, credentials, system, util, vault
+from . import FEATURES, __version__, api, config, credentials, system, util, vault
 
 try:
     from . import llm
 except ImportError:  # édition sans modèle de langage
     llm = None
+try:
+    from . import ai
+except ImportError:
+    ai = None
 
 DEFAULT_RULES = (
     "Un dossier par type de séance, numéroté sur deux chiffres : CM/CM01, TD/TD03, TP/TP02. "
@@ -185,6 +194,15 @@ def obtain_token(cfg, method, prompter):
     return credentials.obtain_with_browser(cfg.site, service, prompter.ask, prompter.ask_secret)
 
 
+def probe():
+    """Ce que la fenêtre d'installation doit savoir de la machine, sans rien écrire."""
+    return {"version": __version__, "python": sys.version.split()[0], "system": system.name(),
+            "default_env": str(default_env()), "obsidian": system.obsidian_installed(),
+            "vaults": [str(v) for v in system.obsidian_vaults()],
+            "engines": ai.engines() if ai and "ai" in FEATURES else [],
+            "installs": [str(path) for path in ai.known_configs()] if ai else []}
+
+
 def write_config(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     util.write_json_atomic(path, data)
@@ -316,7 +334,13 @@ def run(answers=None, actions=None, ask=input, ask_secret=getpass.getpass):
     say(p, f"  ✓ Configuration : {config_path}\n")
 
     who = check_token(cfg)
+    until = (answers or {}).get("until")
+    if until == "config":
+        return {"config": str(config_path), "env": str(env), "site": site, "sitename": public.get("sitename"),
+                "login": LOGIN_HINTS.get(login, "browser"), "token_ok": bool(who), "user": who[0] if who else None}
     if not who:
+        if until:
+            raise Abort("pas encore connecté à Moodle")
         # La connexion se fait toujours par l'utilisateur, dans son terminal : un agent ne la fait pas à sa place
         if not p.interactive:
             return finish(cfg, p, pending=["token"], actions=actions)
@@ -337,6 +361,11 @@ def run(answers=None, actions=None, ask=input, ask_secret=getpass.getpass):
     client = api.Client(cfg.site, credentials.read_token(cfg.data["keychain_service"]))
     info = client.call("core_webservice_get_site_info")
     courses = client.call("core_enrol_get_users_courses", userid=info["userid"])
+    if until == "courses":
+        return {"config": str(config_path), "courses": [
+            {"id": c["id"], "shortname": c.get("shortname"), "fullname": util.nfc(c.get("fullname") or ""),
+             "configured": str(c["id"]) in cfg.data["courses"]}
+            for c in sorted(courses, key=lambda c: c.get("fullname") or "")]}
     new = [c for c in courses if str(c["id"]) not in cfg.data["courses"]]
     exclude = []
     if new and p.interactive:

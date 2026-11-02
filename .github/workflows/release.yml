@@ -1,0 +1,61 @@
+# Release macOS : à chaque tag vX.Y.Z, tests puis Moodle Bridge.app (universelle, pont embarqué) publiée dans
+# une release GitHub, sous un nom fixe (Moodle-Bridge-macOS.zip) que le README lie directement.
+# Lancement manuel (onglet Actions › Release macOS › Run workflow) : même fabrication, sans release ; le zip
+# est disponible comme artefact du lancement, pour l'essayer avant de poser le tag.
+
+name: Release macOS
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Tests
+        run: python3 -I -m unittest discover tests
+
+      - name: Application
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            python3 -I menubar/release/make_release.py --expect-tag "$GITHUB_REF_NAME"
+          else
+            python3 -I menubar/release/make_release.py
+          fi
+
+      - name: Artefact (lancement manuel)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moodle-Bridge-macOS
+          path: dist/Moodle-Bridge-macOS.zip
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Moodle-Bridge-macOS.zip
+          generate_release_notes: true
+          body: |
+            ## Installer
+
+            1. Télécharge **Moodle-Bridge-macOS.zip** ci-dessous et ouvre-le.
+            2. Glisse **Moodle Bridge** dans le dossier **Applications**.
+            3. Ouvre-la. La première fois, macOS refuse, parce que l'application n'est pas signée par un compte développeur Apple : ouvre **Réglages Système › Confidentialité et sécurité**, puis clique sur **Ouvrir quand même** en bas de la page.
+
+            Une fenêtre te guide ensuite : ton Moodle, le dossier des cours, une IA si tu veux, la connexion, les cours à suivre. Il faut Python 3.9 ou plus récent ; s'il manque, la fenêtre propose d'installer les outils d'Apple, qui le fournissent.
+
+            **Mettre à jour** : remplace l'application dans Applications par la nouvelle version. Tes réglages et tes cours sont conservés.
+
+            macOS 13 ou plus récent, Apple Silicon ou Intel.

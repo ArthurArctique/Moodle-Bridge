@@ -36,6 +36,17 @@ python3 scripts/moodle_bridge.py token --config ~/Moodle/.moodle-bridge/config.j
 
 Sous Windows, remplace `python3` par `py`. La commande se lance **dans ton terminal** : elle te pose des questions, et personne d'autre, agent IA compris, ne doit faire cette étape à ta place.
 
+## Depuis l'application macOS
+
+Avec l'[application téléchargée](application-macos.md#télécharger-lapplication-le-plus-simple), la connexion se fait dans sa fenêtre d'installation, sans terminal. La méthode est choisie d'après ton Moodle, et le sélecteur *Navigateur / Identifiant / Clé* permet d'en changer.
+
+- **Navigateur** : clique sur « Se connecter dans le navigateur », connecte-toi comme d'habitude, puis accepte quand le navigateur demande d'ouvrir Moodle Bridge. Le jeton revient tout seul. L'application déclare l'adresse `moodlemobile://`, celle à laquelle Moodle répond à l'appli mobile, et le pont vérifie la signature de la réponse : seule la connexion lancée depuis cette fenêtre est acceptée.
+- Si rien ne revient, par exemple parce que l'appli Moodle officielle est installée sur ce Mac et ouvre la réponse à sa place, déplie « Ça ne revient pas ? ». Tu y retrouves la méthode des outils de développement décrite plus bas. Colle ensuite l'adresse `moodlemobile://token=…` dans le champ masqué, ou clique sur « Coller » : l'application lit le presse-papiers, puis le vide.
+- **Identifiant** : ton identifiant et ton mot de passe Moodle. Le mot de passe est transmis au pont par l'entrée standard, jamais par la ligne de commande. Il sert une fois à obtenir le jeton et n'est gardé nulle part.
+- **Clé** : la clé « Moodle mobile web service » de ta page *Préférences → Clés de sécurité*.
+
+Quand le jeton expire, « Renouveler le jeton… » dans le panneau rouvre cette étape.
+
 ## Méthode `password` : identifiant et mot de passe Moodle
 
 1. Saisis ton identifiant Moodle, puis ton mot de passe. Le mot de passe ne s'affiche pas pendant la frappe.

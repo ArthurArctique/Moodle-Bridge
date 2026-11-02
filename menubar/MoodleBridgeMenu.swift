@@ -4,6 +4,8 @@
 // (un dossier par environnement installé) et ne contacte jamais Moodle. « Synchroniser » relance la tâche
 // planifiée launchd du pont, qui a déjà les accès nécessaires aux dossiers OneDrive ou iCloud.
 //
+// La fenêtre d'installation et de reconnexion est dans Setup.swift.
+//
 // Compilation : moodle_bridge.py menubar install (swiftc, outils en ligne de commande d'Apple, macOS 13+).
 
 import AppKit
@@ -723,8 +725,15 @@ final class Bridge: ObservableObject {
         return process.terminationStatus == 0
     }
 
-    /// Le jeton s'obtient dans un terminal (connexion dans le navigateur) : préparer la commande et l'ouvrir.
+    /// Nouveau jeton : la fenêtre de connexion, puis une synchronisation ; le terminal pour un pont trop ancien.
     func renewToken(_ snap: Snapshot) {
+        let opened = SetupWindow.shared.renew(snap, done: { [weak self] in self?.syncNow(snap) },
+                                              terminal: { [weak self] in self?.renewInTerminal(snap) })
+        if !opened { renewInTerminal(snap) }
+    }
+
+    /// Ancienne méthode : la commande `token`, interactive, dans un terminal.
+    func renewInTerminal(_ snap: Snapshot) {
         let file = Self.root.appendingPathComponent(snap.slug).appendingPathComponent("renouveler-jeton.command")
         let command = snap.tokenArgv.map { "'" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" }.joined(separator: " ")
         let script = """
@@ -921,6 +930,7 @@ final class Bridge: ObservableObject {
 @main
 #endif
 struct MoodleBridgeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var bridge = Bridge()
 
     var body: some Scene {
@@ -1944,6 +1954,7 @@ struct Footer: View {
                     get: { bridge.launchAtLogin },
                     set: { bridge.setLaunchAtLogin($0) }))
                 Button("Journal du pont") { bridge.openLog(snap) }
+                Button("Ajouter un Moodle…") { SetupWindow.shared.show() }
                 Divider()
                 Button("Quitter Moodle Bridge") { NSApp.terminate(nil) }
             } label: {
@@ -1962,13 +1973,16 @@ struct EmptyState: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Aucun pont Moodle trouvé", systemImage: "graduationcap").font(.headline)
-            Text("L'état apparaît ici après le prochain appel du pont (synchronisation ou `status`).")
+            Text("Installe-le : quelques étapes, sans terminal. Une installation faite autrement apparaît ici après "
+                 + "le prochain appel du pont (synchronisation ou `status`).")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Spacer()
                 Button("Quitter") { NSApp.terminate(nil) }
+                Spacer()
+                Button("Installer…") { SetupWindow.shared.show() }
+                    .buttonStyle(.borderedProminent)
             }
         }
     }
