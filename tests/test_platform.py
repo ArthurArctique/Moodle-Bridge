@@ -114,6 +114,13 @@ class EnginesTest(unittest.TestCase):
         self.assertEqual(seen["args"][seen["args"].index("--tools") + 1], "")
         self.assertEqual(engine.models_used, {"m"})
 
+    def test_claude_aliases_ask_for_the_latest_models(self):
+        model = lambda settings: llm.make_engine({"engine": "claude-cli", **settings}, "s").model  # noqa: E731
+        self.assertEqual(model({}), "claude-haiku-5-5")  # « haiku », par défaut : Haiku 4.5 en Claude Code 2.1.278
+        self.assertEqual(model({"model": "Sonnet"}), "claude-sonnet-5-5")
+        self.assertEqual(model({"model": "opus"}), "opus")
+        self.assertEqual(model({"model": "claude-haiku-4-5"}), "claude-haiku-4-5")
+
     def test_codex_reads_last_message_file(self):
         def fake_run(args, prompt, timeout, cwd, what):
             self.assertIn("read-only", args)

@@ -23,8 +23,8 @@ HINTS = {"claude-cli": "abonnement Claude", "codex-cli": "compte ChatGPT",
          "command": "Ollama, llm… : la demande arrive sur l'entrée standard",
          "none": "rangement par section, pas de résumés ni d'énigmes"}
 CLAUDE_MODELS = [
-    {"id": "haiku", "label": "Haiku", "hint": "rapide et économique, recommandé"},
-    {"id": "sonnet", "label": "Sonnet", "hint": "plus fin, plus lent"},
+    {"id": "haiku", "label": "Haiku 5.5", "hint": "rapide et économique, recommandé"},
+    {"id": "sonnet", "label": "Sonnet 5.5", "hint": "plus fin, plus lent"},
     {"id": "opus", "label": "Opus", "hint": "le plus capable, le plus coûteux"},
 ]
 # Alias de Gemini CLI, qui suivent ses nouvelles versions ; Antigravity, lui, liste les modèles du compte

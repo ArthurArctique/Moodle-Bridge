@@ -61,7 +61,7 @@ Moodle Bridge appelle une **ligne de commande** déjà installée et connectée 
 
 | `classify.engine` | Commande | Compte utilisé | Modèle par défaut |
 |---|---|---|---|
-| `claude-cli` | [Claude Code](https://docs.claude.com/claude-code) (`claude`) | abonnement Claude | `haiku` (le dernier Haiku) |
+| `claude-cli` | [Claude Code](https://docs.claude.com/claude-code) (`claude`) | abonnement Claude | `haiku`, demandé sous le nom `claude-haiku-5-5` : l'alias de Claude Code sert parfois encore un Haiku plus ancien |
 | `codex-cli` | [Codex](https://github.com/openai/codex) (`codex`) | compte ChatGPT ou clé OpenAI déjà configurée | celui de Codex : indique un petit modèle disponible pour ton compte dans `classify.model` |
 | `gemini-cli` | [Antigravity CLI](https://antigravity.google) (`agy`), sinon [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini`) | compte Google ; offre payante ou clé d'API pour Gemini CLI | celui de la commande : l'onglet IA et `ai` proposent d'abord le plus léger des Flash |
 | `command` | n'importe quelle commande qui lit la demande sur son entrée standard et répond sur sa sortie | — | `classify.model`, remplacé dans `{model}` |

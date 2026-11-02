@@ -107,7 +107,7 @@ Une route dont le dossier sort de celui du cours (une matière hébergée dans l
 | `classify.engine` | Commande | Modèle par défaut |
 |---|---|---|
 | `none` | — | — |
-| `claude-cli` | `claude -p` (Claude Code, abonnement Claude) | `haiku` (alias : `haiku`, `sonnet`, `opus`) |
+| `claude-cli` | `claude -p` (Claude Code, abonnement Claude) | `haiku` (alias : `haiku`, `sonnet`, `opus` ; `haiku` et `sonnet` sont demandés en 5.5 par leur nom complet) |
 | `codex-cli` | `codex exec` (Codex, compte ChatGPT ou clé OpenAI) | celui de Codex ; `ai status --json` liste les modèles du compte |
 | `gemini-cli` | `agy` (Antigravity CLI, compte Google), sinon `gemini` (Gemini CLI) | celui de la commande ; `ai status --json` liste les modèles du compte, le plus léger des Flash d'abord |
 | `command` | toute commande lisant l'entrée standard, par exemple `["ollama", "run", "{model}"]` | `model` |

@@ -17,6 +17,10 @@ from . import system
 ENGINES = ("none", "claude-cli", "codex-cli", "gemini-cli", "command")
 # Modèle par défaut de chaque moteur : un petit modèle suffit (None : celui que la commande choisit)
 DEFAULT_MODELS = {"claude-cli": "haiku", "codex-cli": None, "gemini-cli": None, "command": None}
+# Claude Code fait suivre ses alias avec retard : en 2.1.278, « haiku » sert encore Haiku 4.5 et « sonnet »
+# Sonnet 5. Le pont demande donc ces modèles par leur nom complet ; « opus » reste un alias, Opus 5.5 n'étant
+# pas accepté par toutes les versions de Claude Code. Un nom complet choisi par l'utilisateur passe tel quel.
+CLAUDE_ALIASES = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5"}
 # Commandes de chaque moteur, la préférée d'abord. Gemini : Antigravity CLI (agy) a remplacé Gemini CLI pour les
 # comptes Google gratuits et Google One ; Gemini CLI reste celle des offres payantes et des clés d'API.
 COMMANDS = {"claude-cli": ("claude",), "codex-cli": ("codex",), "gemini-cli": ("agy", "gemini")}
@@ -52,7 +56,8 @@ class ClaudeCli:
 
     def __init__(self, settings, system_prompt):
         self.command = settings.get("command") or DEFAULT_COMMANDS[self.name]
-        self.model = settings.get("model") or DEFAULT_MODELS[self.name]
+        model = settings.get("model") or DEFAULT_MODELS[self.name]
+        self.model = CLAUDE_ALIASES.get(model.lower(), model)
         self.timeout = int(settings.get("timeout_s") or 300)
         self.system_prompt = system_prompt
         self.models_used = set()  # modèles réellement servis, pour le journal
