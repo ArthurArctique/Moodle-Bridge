@@ -9,7 +9,7 @@ Pour l'agent qui accompagne une installation. Les étapes sont détaillées pour
 1. **Site** : l'utilisateur colle l'adresse de son Moodle, n'importe quelle page convient. L'assistant vérifie que l'API de l'appli mobile est ouverte et repère le type de connexion.
 2. **Dossier des cours** : `~/Moodle` par défaut, ou un sous-dossier d'un coffre Obsidian existant.
 3. **Coffre Obsidian** : `Tableau de bord/` dans le dossier des cours par défaut. Si Obsidian est installé et que le dossier des cours n'est dans aucun coffre, l'assistant y crée `.obsidian` pour qu'Obsidian l'ouvre comme coffre. Les textes vont dans `.moodle-bridge/textes/`.
-4. **IA** (éditions `main` et `cli-ia`) : aucune, Claude Code, Codex ou une autre commande. L'assistant ne propose que les commandes présentes sur la machine.
+4. **IA** (éditions `main` et `cli-ia`) : aucune, Claude Code, Codex, Gemini ou une autre commande. L'assistant ne propose que les commandes présentes sur la machine.
 5. **Fréquence** : 120 min par défaut, 15 min au minimum.
 6. **Connexion à Moodle** : voir plus bas. Le jeton est vérifié auprès de Moodle.
 7. **Cours** : tous les cours où l'utilisateur est inscrit, chacun dans un dossier tiré de son nom court. L'utilisateur peut en exclure.
@@ -29,8 +29,8 @@ Utile quand c'est l'agent qui pose les questions. Les réponses sont passées en
 | `vault` | dossier des notes Obsidian générées, relatif à `env` (`null` ou `"aucun"` : pas de coffre) | `Tableau de bord` |
 | `index` | ancien tableau de bord en un fichier, relatif à `env` | `null` |
 | `texts_dir` | dossier des textes, relatif à `env` | `.moodle-bridge/textes` |
-| `engine` | `none`, `claude-cli`, `codex-cli`, `command` | la première commande trouvée, sinon `none` |
-| `command` | chemin de `claude` ou `codex`, ou commande complète pour `command` (liste ou chaîne ; `{model}` y est remplacé) | trouvé dans le `PATH` |
+| `engine` | `none`, `claude-cli`, `codex-cli`, `gemini-cli`, `command` | la première commande trouvée, sinon `none` |
+| `command` | chemin de `claude`, `codex`, `agy` ou `gemini`, ou commande complète pour `command` (liste ou chaîne ; `{model}` y est remplacé) | trouvé dans le `PATH` |
 | `model` | modèle de l'IA | petit modèle par défaut du moteur |
 | `mode` | `classify` (dossiers CM/TD/TP, avec IA) ou `mirror` (sections Moodle) | `classify` avec IA, sinon `mirror` |
 | `interval` | minutes entre deux synchronisations | `120` |

@@ -109,14 +109,15 @@ Une route dont le dossier sort de celui du cours (une matière hébergée dans l
 | `none` | — | — |
 | `claude-cli` | `claude -p` (Claude Code, abonnement Claude) | `haiku` (alias : `haiku`, `sonnet`, `opus`) |
 | `codex-cli` | `codex exec` (Codex, compte ChatGPT ou clé OpenAI) | celui de Codex ; `ai status --json` liste les modèles du compte |
+| `gemini-cli` | `agy` (Antigravity CLI, compte Google), sinon `gemini` (Gemini CLI) | celui de la commande ; `ai status --json` liste les modèles du compte, le plus léger des Flash d'abord |
 | `command` | toute commande lisant l'entrée standard, par exemple `["ollama", "run", "{model}"]` | `model` |
 
 `classify.command` donne le chemin de la commande. Mieux vaut un chemin absolu : la tâche planifiée n'a pas le `PATH` du terminal. Si la commande échoue, parce qu'elle est déconnectée ou à court de quota, les fichiers ambigus vont dans la boîte d'attente : rien n'est perdu. Le journal indique le modèle réellement utilisé.
 
 **Changer d'IA ou de modèle** : la commande `ai` le fait sans éditer le JSON.
 - `ai status [--json]` : moteur et modèle actuels, moteurs installés et connectés, modèles proposés ;
-- `ai set --engine claude-cli|codex-cli|command|none [--model M] [--command C]` : écrit `classify.engine`, `classify.model` et le chemin absolu de la commande. Les réglages propres aux résumés (`summaries`) et aux mystères (`notes.mystery`) sont remis à vide pour suivre ce choix ;
-- `ai login` : connexion de Claude Code ou de Codex, **dans le terminal de l'utilisateur** (elle passe par le navigateur) ;
+- `ai set --engine claude-cli|codex-cli|gemini-cli|command|none [--model M] [--command C]` : écrit `classify.engine`, `classify.model` et le chemin absolu de la commande. Les réglages propres aux résumés (`summaries`) et aux mystères (`notes.mystery`) sont remis à vide pour suivre ce choix ;
+- `ai login` : connexion de Claude Code, de Codex ou de Gemini (première ouverture d'`agy` ou de `gemini`), **dans le terminal de l'utilisateur** (elle passe par le navigateur) ;
 - `ai test` : un court essai réel, avec le modèle effectivement utilisé ;
 - `ai` seul : menu interactif pour l'utilisateur, aussi accessible par un double-clic sur `Choisir-IA.command` (macOS) ou `Choisir-IA.bat` (Windows), et par l'onglet IA de l'application macOS.
 

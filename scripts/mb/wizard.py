@@ -293,13 +293,15 @@ def run(answers=None, actions=None, ask=input, ask_secret=getpass.getpass):
             options.insert(0, ("claude-cli", f"Claude Code ({found['claude-cli']})"))
         if "codex-cli" in found:
             options.insert(len(options) - 1, ("codex-cli", f"Codex ({found['codex-cli']})"))
-        options.append(("command", "Autre commande (Ollama, llm, Gemini CLI…)"))
+        if "gemini-cli" in found:
+            options.insert(len(options) - 1, ("gemini-cli", f"Gemini ({found['gemini-cli']})"))
+        options.append(("command", "Autre commande (Ollama, llm…)"))
         default = (previous or {}).get("classify", {}).get("engine") or options[0][0]
         say(p, "L'IA range les fichiers ambigus (CM/TD/TP…) et résume les annonces. Elle passe par la ligne de "
                "commande que tu utilises déjà (ton abonnement, aucune clé d'API).")
         choice = p.choice("engine", "Quelle IA utiliser ?", options, default)
         engine = {"engine": choice}
-        if choice in ("claude-cli", "codex-cli"):
+        if choice in ("claude-cli", "codex-cli", "gemini-cli"):
             engine["command"] = p.text("command", "Chemin de la commande", found.get(choice)) or found.get(choice)
             engine["model"] = p.text("model", "Modèle (Entrée : petit modèle par défaut)", None)
         elif choice == "command":

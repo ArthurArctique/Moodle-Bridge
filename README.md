@@ -182,7 +182,7 @@ flowchart LR
     subgraph O[Ton ordinateur]
         T([Tâche planifiée<br/>toutes les 2 h]) --> P[Moodle Bridge]
         J[[Coffre du système<br/>jeton]] -.-> P
-        IA[[IA facultative<br/>Claude Code, Codex, Ollama…]] -.-> P
+        IA[[IA facultative<br/>Claude Code, Codex, Gemini, Ollama…]] -.-> P
         P --> D[📁 Dossier des cours<br/>un dossier par cours]
         P --> V[📒 Tableau de bord<br/>coffre Obsidian : accueil,<br/>matières, devoirs, notes]
         P --> S[(état .moodle-bridge)]
@@ -225,6 +225,7 @@ Sans IA, chaque cours est rangé par section Moodle, ce qui suffit souvent. Avec
 Moodle Bridge n'a **aucune clé d'API à configurer**. Il passe par une ligne de commande que tu utilises déjà :
 - **Claude Code** (`claude`) : ton abonnement Claude, petit modèle Haiku par défaut ;
 - **Codex** (`codex`) : ton compte ChatGPT ;
+- **Gemini** (`agy`, Antigravity CLI, ou `gemini`) : ton compte Google ;
 - **toute autre commande** qui lit une demande et répond, par exemple `ollama run llama3.2` pour une IA 100 % locale.
 
 **Ce qui est envoyé** : les noms des fichiers et des sections, l'arborescence du cours et le texte des annonces. Le contenu des documents n'est jamais envoyé. Un passage sans nouveauté ne consomme rien. Détails : [docs/ia.md](docs/ia.md).

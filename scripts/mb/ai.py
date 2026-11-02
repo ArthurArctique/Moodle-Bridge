@@ -1,4 +1,4 @@
-"""Choix de l'IA : moteur (Claude Code, Codex, autre commande ou aucune) et modèle, sans éditer de JSON.
+"""Choix de l'IA : moteur (Claude Code, Codex, Gemini, autre commande ou aucune) et modèle, sans éditer de JSON.
 
 Le pont n'a jamais de clé d'API : il passe par une ligne de commande déjà installée et connectée. Ce module dit
 lesquelles sont présentes et connectées, liste leurs modèles, change le réglage par défaut (`classify`, que les
@@ -7,6 +7,7 @@ l'application de barre des menus (`ai status --json`, `ai set`, `ai login`), aux
 et au terminal (`ai`, sans action : questions pas à pas).
 """
 
+import functools
 import json
 import os
 import subprocess
@@ -15,8 +16,10 @@ from pathlib import Path
 
 from . import config, llm, system, util
 
-LABELS = {"claude-cli": "Claude Code", "codex-cli": "Codex", "command": "Autre commande", "none": "Aucune IA"}
+LABELS = {"claude-cli": "Claude Code", "codex-cli": "Codex", "gemini-cli": "Gemini", "command": "Autre commande",
+          "none": "Aucune IA"}
 HINTS = {"claude-cli": "abonnement Claude", "codex-cli": "compte ChatGPT",
+         "gemini-cli": "compte Google, par Antigravity (agy) ou Gemini CLI",
          "command": "Ollama, llm… : la demande arrive sur l'entrée standard",
          "none": "rangement par section, pas de résumés ni d'énigmes"}
 CLAUDE_MODELS = [
@@ -24,10 +27,19 @@ CLAUDE_MODELS = [
     {"id": "sonnet", "label": "Sonnet", "hint": "plus fin, plus lent"},
     {"id": "opus", "label": "Opus", "hint": "le plus capable, le plus coûteux"},
 ]
-LOGIN_ARGS = {"claude-cli": ["auth", "login"], "codex-cli": ["login"]}
+# Alias de Gemini CLI, qui suivent ses nouvelles versions ; Antigravity, lui, liste les modèles du compte
+GEMINI_MODELS = [
+    {"id": "flash-lite", "label": "Flash-Lite", "hint": "rapide et économique, recommandé"},
+    {"id": "flash", "label": "Flash", "hint": "équilibré"},
+    {"id": "pro", "label": "Pro", "hint": "le plus capable, plus lent"},
+]
+# Antigravity et Gemini CLI n'ont pas de commande de connexion : la première ouverture propose de se connecter
+LOGIN_ARGS = {"claude-cli": ["auth", "login"], "codex-cli": ["login"], "gemini-cli": []}
 INSTALL = {
     "claude-cli": "https://docs.claude.com/claude-code (macOS, Linux : curl -fsSL https://claude.ai/install.sh | bash)",
     "codex-cli": "https://github.com/openai/codex (npm install -g @openai/codex)",
+    "gemini-cli": "https://antigravity.google (Antigravity CLI, commande agy) ; Gemini CLI pour une offre payante "
+                  "ou une clé d'API : npm install -g @google/gemini-cli",
 }
 # Emplacements habituels des commandes, que la tâche planifiée et l'application ne trouvent pas dans leur PATH
 EXTRA_DIRS = [Path.home() / d for d in (".local/bin", ".claude/local", ".npm-global/bin", ".bun/bin", ".volta/bin")] + [
@@ -46,16 +58,17 @@ class AiError(Exception):
 
 def locate(engine, configured=None):
     """Chemin de la commande d'un moteur : celle de la configuration, celle du PATH, ou un emplacement habituel."""
-    for candidate in (configured, llm.DEFAULT_COMMANDS.get(engine)):
+    names = llm.COMMANDS.get(engine, ())
+    for candidate in (configured,) + names:
         found = system.find_command(candidate) if isinstance(candidate, str) else None
         if found:
             return found
-    name = llm.DEFAULT_COMMANDS.get(engine)
-    for folder in EXTRA_DIRS if name else ():
-        for suffix in ((".cmd", ".exe", "") if system.IS_WINDOWS else ("",)):
-            path = folder / f"{name}{suffix}"
-            if path.is_file():
-                return str(path)
+    for name in names:
+        for folder in EXTRA_DIRS:
+            for suffix in ((".cmd", ".exe", "") if system.IS_WINDOWS else ("",)):
+                path = folder / f"{name}{suffix}"
+                if path.is_file():
+                    return str(path)
     return None
 
 
@@ -67,10 +80,43 @@ def _quick(args, timeout=20):
         return None
 
 
+@functools.lru_cache(maxsize=4)
+def _agy_models(path):
+    """(code de sortie, sortie) de `agy models`, gardés pour la durée du processus : l'état de connexion et la liste
+    des modèles posent la même question."""
+    proc = _quick([path, "models"], timeout=30)
+    return (None, "") if proc is None else (proc.returncode, (proc.stdout or "") + (proc.stderr or ""))
+
+
+def antigravity_models(path):
+    """Modèles du compte selon `agy models` (une ligne « identifiant<TAB>nom » chacun), None si la commande échoue."""
+    code, output = _agy_models(path)
+    if code != 0:
+        return None
+    rows = []
+    for line in output.splitlines():
+        slug, tab, label = line.partition("\t")
+        if tab and slug.strip() and " " not in slug.strip():
+            rows.append({"id": slug.strip(), "label": label.strip() or slug.strip(), "hint": ""})
+    return rows
+
+
 def logged_in(engine, path):
     """Vrai ou faux si la commande sait le dire, None sinon. De `claude auth status`, seul `loggedIn` est lu."""
     if not path or engine not in LOGIN_ARGS:
         return None
+    if engine == "gemini-cli":
+        if llm.is_antigravity(path):
+            # agy n'a pas de commande d'état : la liste des modèles du compte ne s'obtient que connecté
+            if antigravity_models(path):
+                return True
+            code, output = _agy_models(path)
+            asks = ("sign in", "log in", "login", "not authenticated", "unauthenticated", "credentials")
+            return False if code and any(word in output.lower() for word in asks) else None
+        # Gemini CLI : identifiants enregistrés à la connexion, ou clé d'API (le fichier n'est pas lu)
+        keys = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS")
+        saved = (Path.home() / ".gemini" / "oauth_creds.json").exists()
+        return True if saved or any(os.environ.get(k) for k in keys) else None
     if engine == "claude-cli":
         proc = _quick([path, "auth", "status"])
         try:
@@ -82,9 +128,20 @@ def logged_in(engine, path):
 
 
 def models(engine, path):
-    """Modèles proposés : alias de Claude Code, liste publique de Codex (`codex debug models`)."""
+    """Modèles proposés : alias de Claude Code, liste publique de Codex (`codex debug models`), modèles du compte
+    Antigravity (`agy models`, le plus léger des Flash d'abord) ou alias de Gemini CLI."""
     if engine == "claude-cli":
         return [dict(m) for m in CLAUDE_MODELS]
+    if engine == "gemini-cli" and path:
+        if not llm.is_antigravity(path):
+            return [dict(m) for m in GEMINI_MODELS]
+        rows = antigravity_models(path) or []
+        light = next((m for m in rows if "flash" in m["id"] and m["id"].endswith("-low")),
+                     next((m for m in rows if "flash" in m["id"]), None))
+        if light:
+            light["hint"] = "rapide et économique, recommandé"
+            rows = [light] + [m for m in rows if m is not light]
+        return rows
     if engine == "codex-cli" and path:
         proc = _quick([path, "debug", "models"])
         try:
@@ -120,7 +177,7 @@ def engines(now=None, with_models=True):
     """Moteurs proposés, installés ou non, connectés ou non, avec leurs modèles ; `now` : le réglage actuel, s'il existe."""
     now = now or {"engine": "none", "model": None, "command": None}
     found = []
-    for engine in ("claude-cli", "codex-cli"):
+    for engine in ("claude-cli", "codex-cli", "gemini-cli"):
         path = locate(engine, now["command"] if now["engine"] == engine else None)
         listed = models(engine, path) if with_models else []
         if now["engine"] == engine and now["model"] and all(m["id"] != now["model"] for m in listed):
@@ -179,12 +236,15 @@ def apply(config_path, engine, model=None, command=None):
 
 
 def login(engine, path=None):
-    """Connexion interactive dans le terminal courant (`claude auth login`, `codex login`)."""
+    """Connexion interactive dans le terminal courant (`claude auth login`, `codex login`, première ouverture d'agy
+    ou de gemini)."""
     path = locate(engine, path)
     if engine not in LOGIN_ARGS:
         raise AiError(f"{LABELS.get(engine, engine)} : pas de connexion à faire")
     if not path:
         raise AiError(f"{LABELS[engine]} n'est pas installé : {INSTALL[engine]}")
+    if not LOGIN_ARGS[engine]:
+        print(f"{Path(path).name} s'ouvre : connecte-toi avec ton compte Google, puis quitte-le (Ctrl+C).\n")
     return subprocess.call([path] + LOGIN_ARGS[engine])
 
 

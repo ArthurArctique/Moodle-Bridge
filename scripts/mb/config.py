@@ -26,9 +26,11 @@ DEFAULTS = {
         "max_size_mb": 200,
     },
     "classify": {
-        # none, claude-cli (Claude Code), codex-cli (Codex) ou command (toute commande lisant l'entrée standard)
+        # none, claude-cli (Claude Code), codex-cli (Codex), gemini-cli (Antigravity CLI ou Gemini CLI) ou command
+        # (toute commande lisant l'entrée standard)
         "engine": "none",
-        # null : `claude` ou `codex` trouvé dans le PATH ; un chemin absolu est plus sûr pour la tâche planifiée
+        # null : `claude`, `codex`, `agy` ou `gemini` trouvé dans le PATH ; un chemin absolu est plus sûr pour la
+        # tâche planifiée
         "command": None,
         # null : le petit modèle par défaut du moteur (voir llm.DEFAULT_MODELS)
         "model": None,

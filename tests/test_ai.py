@@ -1,4 +1,4 @@
-"""Tests du choix de l'IA : fausses commandes claude et codex, aucun appel réseau.
+"""Tests du choix de l'IA : fausses commandes claude, codex et agy, aucun appel réseau.
 
 Lancer : python3 -I -m unittest discover <skill>/tests
 """
@@ -27,6 +27,17 @@ if [ "$1" = "debug" ]; then
                     {"slug": "cache", "display_name": "Caché", "visibility": "hide"}]}'
 fi
 """
+FAKE_AGY = """#!/bin/sh
+if [ "$1" = "models" ]; then
+  echo 'Fetching available models...'
+  printf 'gemini-9-pro\\tGemini 9 Pro\\n'
+  printf 'gemini-9-flash-low\\tGemini 9 Flash (Low)\\n'
+  exit 0
+fi
+cat > /dev/null
+echo '{"event": "init", "conversation_id": "x"}'
+echo '{"event": "result", "result": {"status": "SUCCESS", "response": "{\\"ok\\": true}"}}'
+"""
 
 
 def fake(folder, name, body):
@@ -44,6 +55,7 @@ class AiTests(unittest.TestCase):
         self.bin.mkdir()
         self.claude = fake(self.bin, "claude", FAKE_CLAUDE % "true")
         self.codex = fake(self.bin, "codex", FAKE_CODEX)
+        self.agy = fake(self.bin, "agy", FAKE_AGY)  # sans elle, le vrai agy de la machine répondrait
         self.path = self.tmp / ".moodle-bridge" / "config.json"
         self.path.parent.mkdir()
         self.path.write_text(json.dumps({
@@ -65,6 +77,17 @@ class AiTests(unittest.TestCase):
         self.assertEqual([m["id"] for m in codex["models"]], [None, "petit"])  # modèle caché exclu
         self.assertEqual(info["overrides"], {"summaries": {"model": "gros-modèle"}, "notes.mystery": {"engine": "codex-cli"}})
         self.assertNotIn("secret@example.com", json.dumps(info))
+
+    def test_gemini_through_antigravity(self):
+        gemini = next(e for e in ai.status(config.load(self.path))["engines"] if e["id"] == "gemini-cli")
+        self.assertEqual((gemini["path"], gemini["logged_in"]), (str(self.agy), True))
+        # le plus léger des Flash d'abord, recommandé ; la ligne de progression n'est pas un modèle
+        self.assertEqual([m["id"] for m in gemini["models"]], ["gemini-9-flash-low", "gemini-9-pro"])
+        self.assertIn("recommandé", gemini["models"][0]["hint"])
+        ai.apply(self.path, "gemini-cli", "gemini-9-flash-low")
+        result = ai.test(config.load(self.path))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["model"], "gemini-9-flash-low")
 
     def test_apply_keeps_the_rest_and_frees_tasks(self):
         cleared = ai.apply(self.path, "claude-cli", "sonnet")

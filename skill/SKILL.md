@@ -23,7 +23,7 @@ Cherche aussi un clone du dépôt, reconnaissable à `scripts/moodle_bridge.py` 
 Pose ces questions, en une fois si possible :
 
 1. **Système** : macOS, Windows ou Linux ? Tu peux le constater toi-même.
-2. **IA** : veut-il qu'une IA range les fichiers ambigus (CM/TD/TP numérotés) et résume les annonces ? Elle passe par une ligne de commande déjà installée et connectée (Claude Code, Codex, ou une commande comme Ollama), sans clé d'API. Sans IA, les fichiers sont rangés par section Moodle et le coffre Obsidian est le même : il ne dépend jamais d'un modèle. Le choix se change ensuite à tout moment (commande `ai`, `Choisir-IA`, onglet IA de l'application).
+2. **IA** : veut-il qu'une IA range les fichiers ambigus (CM/TD/TP numérotés) et résume les annonces ? Elle passe par une ligne de commande déjà installée et connectée (Claude Code, Codex, Gemini, ou une commande comme Ollama), sans clé d'API. Sans IA, les fichiers sont rangés par section Moodle et le coffre Obsidian est le même : il ne dépend jamais d'un modèle. Le choix se change ensuite à tout moment (commande `ai`, `Choisir-IA`, onglet IA de l'application).
 3. **macOS seulement** : veut-il l'application de barre des menus (état, nouveaux documents, annonces, notes) ?
 4. **Lecture** : a-t-il Obsidian, VS Code ou un autre lecteur Markdown ? Ce n'est pas obligatoire, mais le coffre (accueil, une note par matière, devoirs, échéances, annonces, notes) est pensé pour Obsidian. Sans lecteur, ce sont des fichiers Markdown bruts.
 

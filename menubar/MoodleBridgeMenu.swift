@@ -251,8 +251,8 @@ struct AiEngine: Decodable, Identifiable {
     let models: [AiModel]
     let install: String?
 
-    /// Claude Code et Codex se connectent à un compte ; les autres moteurs n'ont rien à connecter.
-    var needsAccount: Bool { id == "claude-cli" || id == "codex-cli" }
+    /// Claude Code, Codex et Gemini se connectent à un compte ; les autres moteurs n'ont rien à connecter.
+    var needsAccount: Bool { ["claude-cli", "codex-cli", "gemini-cli"].contains(id) }
 }
 
 struct AiStatus: Decodable {
@@ -827,7 +827,7 @@ final class Bridge: ObservableObject {
         }
     }
 
-    /// Connexion à Claude Code ou Codex, ou choix pas à pas : dans un terminal, comme le jeton Moodle.
+    /// Connexion à Claude Code, Codex ou Gemini, ou choix pas à pas : dans un terminal, comme le jeton Moodle.
     func aiInTerminal(_ snap: Snapshot, login engine: String? = nil) {
         guard let argv = snap.aiArgv else { return }
         let name = engine == nil ? "choisir-ia.command" : "connexion-ia.command"

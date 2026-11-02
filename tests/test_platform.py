@@ -124,6 +124,42 @@ class EnginesTest(unittest.TestCase):
             engine = llm.make_engine({"engine": "codex-cli", "model": "petit"}, "s")
             self.assertEqual(engine.ask("x"), "réponse")
 
+    def test_antigravity_gets_the_prompt_on_stdin(self):
+        seen = {}
+
+        def fake_run(args, prompt, timeout, cwd, what):
+            seen.update(args=args, prompt=prompt)
+            return mock.Mock(stdout="\n".join([
+                json.dumps({"event": "init", "conversation_id": "c"}),
+                json.dumps({"event": "result", "result": {"status": "SUCCESS", "response": "{}"}})]))
+
+        with mock.patch.object(llm, "_run", fake_run), mock.patch.object(llm, "_resolve", lambda c: c):
+            engine = llm.make_engine({"engine": "gemini-cli", "command": "/x/agy", "model": "flash"}, "consigne")
+            self.assertEqual(engine.ask("note : 17"), "{}")
+        self.assertIn("--sandbox", seen["args"])
+        self.assertNotIn("note : 17", " ".join(seen["args"]))  # jamais dans la liste des processus
+        message = json.loads(seen["prompt"])
+        self.assertEqual(message["event"], "user")
+        self.assertIn("consigne", message["message"]["content"])
+        self.assertIn("note : 17", message["message"]["content"])
+
+        failed = json.dumps({"event": "result", "result": {"status": "ERROR", "error": "quota épuisé"}})
+        with mock.patch.object(llm, "_run", lambda *a: mock.Mock(stdout=failed)), \
+                mock.patch.object(llm, "_resolve", lambda c: c):
+            with self.assertRaisesRegex(llm.EngineError, "quota"):
+                engine.ask("x")
+
+    def test_gemini_cli_reads_json_response(self):
+        def fake_run(args, prompt, timeout, cwd, what):
+            self.assertEqual(args[:3], ["/x/gemini", "--output-format", "json"])
+            self.assertIn("demande", prompt)
+            return mock.Mock(stdout=json.dumps({"response": "réponse", "stats": {"models": {"gemini-flash": {}}}}))
+
+        with mock.patch.object(llm, "_run", fake_run), mock.patch.object(llm, "_resolve", lambda c: c):
+            engine = llm.make_engine({"engine": "gemini-cli", "command": "/x/gemini"}, "s")
+            self.assertEqual(engine.ask("demande"), "réponse")
+        self.assertEqual(engine.models_used, {"gemini-flash"})
+
 
 class CredentialsTest(unittest.TestCase):
     def _answer(self, payload):

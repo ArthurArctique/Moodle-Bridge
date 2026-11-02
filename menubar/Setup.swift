@@ -85,7 +85,7 @@ struct SetupError: LocalizedError {
 enum BridgeRuntime {
     static let support = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/Moodle Bridge", isDirectory: true)
-    /// Une application lancée depuis le Finder n'a qu'un PATH minimal : le pont y cherche Claude Code et Codex.
+    /// Une application lancée depuis le Finder n'a qu'un PATH minimal : le pont y cherche Claude Code, Codex et Gemini.
     static let searchPath = (["~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"].map { NSString(string: $0).expandingTildeInPath }
         + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]).joined(separator: ":")
 
@@ -458,7 +458,7 @@ final class SetupModel: ObservableObject {
             let probe = try await cli.call(Probe.self, ["init", "--probe"])
             self.probe = probe
             envPath = probe.defaultEnv
-            let ready = probe.engines.first { ["claude-cli", "codex-cli"].contains($0.id) && $0.installed && $0.loggedIn == true }
+            let ready = probe.engines.first { $0.needsAccount && $0.installed && $0.loggedIn == true }
             engine = ready?.id ?? "none"
             model = ready?.models.first?.id
         } catch {
@@ -1250,8 +1250,8 @@ struct AiStep: View {
         VStack(alignment: .leading, spacing: 16) {
             StepTitle(title: "Une IA pour ranger ?",
                       subtitle: "Facultative. Elle range les fichiers ambigus en CM/TD/TP, résume les annonces longues et "
-                        + "habille les notes mystère. Elle passe par Claude Code ou Codex, avec ton abonnement : aucune clé "
-                        + "d'API.")
+                        + "habille les notes mystère. Elle passe par Claude Code, Codex ou Gemini, avec ton compte : aucune "
+                        + "clé d'API.")
             VStack(spacing: 8) {
                 ForEach(model.engines) { engine in
                     ChoiceCard(selected: model.engine == engine.id, title: engine.label, detail: engine.hint,
@@ -1281,7 +1281,7 @@ struct AiStep: View {
                 }
             }
             if model.engines.contains(where: { $0.needsAccount && !$0.installed }) {
-                Button("Installer Claude Code ou Codex…") { NSWorkspace.shared.open(URL(string: Bridge.aiDocs)!) }
+                Button("Installer Claude Code, Codex ou Gemini…") { NSWorkspace.shared.open(URL(string: Bridge.aiDocs)!) }
                     .buttonStyle(.link)
                     .font(.caption)
             }

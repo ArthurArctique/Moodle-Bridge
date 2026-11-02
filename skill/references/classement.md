@@ -35,6 +35,7 @@ L'appel passe par la ligne de commande choisie (`scripts/mb/llm.py`), toujours l
 
 - `claude-cli` : `claude -p --model <modèle> --tools "" --setting-sources "" --strict-mcp-config --output-format json --no-session-persistence` ; aucun outil, skill, serveur MCP ni réglage de projet ;
 - `codex-cli` : `codex exec --sandbox read-only --ephemeral --skip-git-repo-check -o <fichier> [-m <modèle>] -` ; bac à sable en lecture seule, session éphémère ;
+- `gemini-cli` : `agy --input-format stream-json --output-format stream-json --sandbox --disable-slash-commands [--model <modèle>]`, la demande en un message JSON sur l'entrée standard ; bac à sable, l'appel reste dans l'historique d'Antigravity. Sans `agy` : `gemini --output-format json [--model <modèle>]`, la demande sur l'entrée standard ;
 - `command` : la commande configurée reçoit la demande sur son entrée standard et répond sur sa sortie standard (par exemple `ollama run {model}`).
 
 Quand `zotero.enabled` est vrai, la consigne ajoute que les supports de cours (diaporamas ou polycopiés de CM, chapitres et résumés de cours, livres, articles) ne se rangent pas dans l'arborescence : le modèle répond alors `dest = "@zotero"`. Le fichier est mis de côté dans `zotero.staging/<code>/` en attendant un import confirmé par l'utilisateur (voir `fonctionnement.md`, « Supports de cours et Zotero »).

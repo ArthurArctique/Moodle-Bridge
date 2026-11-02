@@ -74,7 +74,7 @@ def ai_ui():
 def values(cfg):
     engine = (cfg.data.get("classify") or {}).get("engine") or "none"
     labels = {"none": "aucun", "claude-cli": "Claude Code (`claude -p`)", "codex-cli": "Codex (`codex exec`)",
-              "command": "commande personnalisée"}
+              "gemini-cli": "Gemini (`agy` ou `gemini`)", "command": "commande personnalisée"}
     return {
         "CLI": f"{python_command()} -I {quote(REPO / 'scripts' / 'moodle_bridge.py')}",
         "CONFIG": quote(cfg.path),

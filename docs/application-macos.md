@@ -26,7 +26,7 @@ Une petite icône dans la barre des menus. Un clic ouvre un panneau. Une fenêtr
 - **Coffre** : ouvre la note d'accueil du coffre Obsidian. Si Obsidian ne connaît pas encore ce coffre, la note s'ouvre dans l'éditeur par défaut et le panneau indique quel dossier ouvrir comme coffre.
 
 Le panneau **ne contacte jamais Moodle** : il lit l'état que Moodle Bridge écrit dans `~/Library/Caches/moodle-bridge/` à chaque passage. Une seule application sert toutes les installations du Mac. Elle ne fait que lancer des commandes du pont :
-- l'onglet IA : `ai status`, `ai set`, `ai test`, qui interrogent Claude Code ou Codex sur ta machine ;
+- l'onglet IA : `ai status`, `ai set`, `ai test`, qui interrogent Claude Code, Codex ou Gemini sur ta machine ;
 - la fenêtre d'installation : `check-site`, `init`, `token`. C'est le pont qui contacte Moodle et range le jeton dans le Trousseau. L'application lui transmet ta réponse de connexion par l'entrée standard, sans la garder ni l'afficher.
 
 ## Installation
@@ -63,7 +63,7 @@ Elle s'ouvre au premier lancement s'il n'existe encore aucune installation, et �
 1. **Bienvenue** : vérifie Python et l'emplacement de l'application. Lancée depuis le zip ou Téléchargements, macOS l'exécute depuis un emplacement temporaire : il faut d'abord la ranger dans Applications.
 2. **Ton Moodle** : colle l'adresse de n'importe quelle page du site, puis « Vérifier ».
 3. **Dossiers** : où ranger les cours (`~/Moodle`, ou un dossier de ton coffre Obsidian) et le sous-dossier des notes Obsidian. Documents, Bureau, iCloud et OneDrive sont signalés : macOS y bloque la synchronisation en arrière-plan sans autorisation.
-4. **IA** : aucune, Claude Code ou Codex, avec le modèle et le mode de rangement.
+4. **IA** : aucune, Claude Code, Codex ou Gemini, avec le modèle et le mode de rangement.
 5. **Connexion** : par le navigateur, par identifiant et mot de passe, ou par clé de sécurité. Voir [Première connexion](premiere-connexion.md#depuis-lapplication-macos).
 6. **Cours** : tous cochés, décoche ceux à laisser de côté.
 7. **Options** : fréquence, première synchronisation, ouverture à la connexion, skill pour tes agents IA.

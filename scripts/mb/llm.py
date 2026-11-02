@@ -1,5 +1,5 @@
-"""Modèles de langage appelés par leur ligne de commande, sans clé d'API : Claude Code, Codex, ou toute
-commande qui lit la demande sur son entrée standard (Ollama, llm, Gemini CLI…).
+"""Modèles de langage appelés par leur ligne de commande, sans clé d'API : Claude Code, Codex, Gemini (Antigravity
+CLI ou Gemini CLI), ou toute commande qui lit la demande sur son entrée standard (Ollama, llm…).
 
 Le pont n'utilise un modèle que pour trois tâches courtes, toujours avec une consigne qui exige une réponse
 JSON : choisir le dossier d'un fichier ambigu, résumer une annonce, habiller une note « mystère ». Chaque
@@ -14,10 +14,13 @@ from pathlib import Path
 
 from . import system
 
-ENGINES = ("none", "claude-cli", "codex-cli", "command")
+ENGINES = ("none", "claude-cli", "codex-cli", "gemini-cli", "command")
 # Modèle par défaut de chaque moteur : un petit modèle suffit (None : celui que la commande choisit)
-DEFAULT_MODELS = {"claude-cli": "haiku", "codex-cli": None, "command": None}
-DEFAULT_COMMANDS = {"claude-cli": "claude", "codex-cli": "codex"}
+DEFAULT_MODELS = {"claude-cli": "haiku", "codex-cli": None, "gemini-cli": None, "command": None}
+# Commandes de chaque moteur, la préférée d'abord. Gemini : Antigravity CLI (agy) a remplacé Gemini CLI pour les
+# comptes Google gratuits et Google One ; Gemini CLI reste celle des offres payantes et des clés d'API.
+COMMANDS = {"claude-cli": ("claude",), "codex-cli": ("codex",), "gemini-cli": ("agy", "gemini")}
+DEFAULT_COMMANDS = {engine: names[0] for engine, names in COMMANDS.items()}
 
 
 class EngineError(Exception):
@@ -99,6 +102,73 @@ class CodexCli:
                 raise EngineError("codex n'a rendu aucune réponse") from exc
 
 
+def is_antigravity(command):
+    """Vrai pour Antigravity CLI (`agy`), faux pour Gemini CLI (`gemini`) : elles se pilotent différemment."""
+    return Path(str(command)).stem.lower() == "agy"
+
+
+class GeminiCli:
+    """Gemini de Google, dans un dossier vide, la demande sur l'entrée standard (jamais dans la liste des processus).
+
+    Antigravity CLI (`agy`) : un tour en flux JSON (`--input-format stream-json`), en bac à sable ; sans terminal
+    pour les accepter, les actions soumises à autorisation (écriture, commande) n'ont pas lieu. Chaque appel reste
+    dans l'historique d'Antigravity.
+    Gemini CLI (`gemini`) : mode sans interface (entrée standard redirigée), sortie JSON ; en mode sans interface,
+    écritures et commandes sont refusées par défaut.
+    """
+
+    name = "gemini-cli"
+
+    def __init__(self, settings, system_prompt):
+        installed = next(filter(None, map(system.find_command, COMMANDS[self.name])), None)
+        self.command = settings.get("command") or installed or DEFAULT_COMMANDS[self.name]
+        self.model = settings.get("model") or DEFAULT_MODELS[self.name]
+        self.timeout = int(settings.get("timeout_s") or 300)
+        self.extra = list(settings.get("args") or [])
+        self.system_prompt = system_prompt
+        self.models_used = {self.model} if self.model else set()
+
+    def ask(self, prompt):
+        command = _resolve(self.command)
+        text = f"{self.system_prompt}\n\n{prompt}"
+        model = ["--model", self.model] if self.model else []
+        with tempfile.TemporaryDirectory(prefix="moodle-bridge-") as cwd:
+            if is_antigravity(command):
+                args = [command, "--input-format", "stream-json", "--output-format", "stream-json", "--sandbox",
+                        "--disable-slash-commands"] + model + self.extra
+                message = json.dumps({"event": "user", "message": {"role": "user", "content": text}},
+                                     ensure_ascii=False)
+                proc = _run(args, message + "\n", self.timeout, cwd, "agy")
+                return self._antigravity_answer(proc.stdout)
+            proc = _run([command, "--output-format", "json"] + model + self.extra, text, self.timeout, cwd, "gemini")
+        try:
+            answer = json.loads(proc.stdout)
+        except ValueError as exc:
+            raise EngineError("sortie de gemini illisible") from exc
+        error = answer.get("error")
+        if error:
+            raise EngineError(f"gemini : {str(error.get('message') if isinstance(error, dict) else error)[:300]}")
+        self.models_used.update((answer.get("stats") or {}).get("models") or {})
+        return answer.get("response") or ""
+
+    @staticmethod
+    def _antigravity_answer(stdout):
+        result = None
+        for line in stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get("event") == "result":
+                result = event.get("result") or {}
+        if result is None:
+            raise EngineError("agy n'a rendu aucune réponse")
+        if result.get("status") != "SUCCESS" or result.get("finished_reason"):
+            reason = result.get("error") or result.get("finished_reason") or result.get("status")
+            raise EngineError(f"agy : {str(reason)[:300]}")
+        return result.get("response") or ""
+
+
 class Command:
     """Commande quelconque : la demande arrive sur l'entrée standard, la réponse est lue sur la sortie standard.
 
@@ -125,7 +195,7 @@ class Command:
             return _run(args, f"{self.system_prompt}\n\n{prompt}", self.timeout, cwd, Path(self.args[0]).name).stdout
 
 
-CLASSES = {"claude-cli": ClaudeCli, "codex-cli": CodexCli, "command": Command}
+CLASSES = {"claude-cli": ClaudeCli, "codex-cli": CodexCli, "gemini-cli": GeminiCli, "command": Command}
 
 
 def settings_for(section, base):
@@ -153,5 +223,9 @@ def make_engine(settings, system_prompt):
 
 def detect():
     """Lignes de commande d'IA présentes sur la machine, pour l'assistant d'installation."""
-    return {engine: system.find_command(command) for engine, command in DEFAULT_COMMANDS.items()
-            if system.find_command(command)}
+    found = {}
+    for engine, names in COMMANDS.items():
+        path = next(filter(None, map(system.find_command, names)), None)
+        if path:
+            found[engine] = path
+    return found

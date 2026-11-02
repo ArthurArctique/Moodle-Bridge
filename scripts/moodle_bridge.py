@@ -763,7 +763,7 @@ def cmd_ai(args):
                 return 0
             now = info["current"]
             print(f"IA : {now['label']}" + (f", modèle {now['model']}" if now["model"] else ""))
-            for engine in info["engines"][:2]:
+            for engine in (e for e in info["engines"] if e["id"] in ai.LOGIN_ARGS):
                 state = ("non installé" if not engine["installed"] else
                          {True: "connecté", False: "non connecté"}.get(engine["logged_in"], "état inconnu"))
                 print(f"  {engine['label']} : {state}" + (f" ({engine['path']})" if engine["path"] else ""))
@@ -772,7 +772,7 @@ def cmd_ai(args):
             return 0
         if args.action == "set":
             if not args.engine:
-                sys.exit("ai set : indiquer --engine (claude-cli, codex-cli, command ou none)")
+                sys.exit("ai set : indiquer --engine (claude-cli, codex-cli, gemini-cli, command ou none)")
             cleared = ai.apply(cfg.path, args.engine, args.model, args.command)
             cfg = config.load(cfg.path)
             result = {"current": ai.current(cfg), "cleared": cleared}
@@ -876,11 +876,11 @@ def main(argv=None):
         p.add_argument("--no-notify", action="store_true", help="ne pas envoyer de notification")
         p.add_argument("--no-mystery", action="store_true", help="ne pas appeler le modèle (mystère par défaut 🎁)")
     if ai:
-        p = sub.add_parser("ai", help="choisir l'IA (Claude Code, Codex, autre, aucune) et son modèle")
+        p = sub.add_parser("ai", help="choisir l'IA (Claude Code, Codex, Gemini, autre, aucune) et son modèle")
         p.add_argument("action", nargs="?", default="choose", choices=["choose", "status", "set", "login", "test"],
                        help="choose (défaut) : questions pas à pas")
         p.add_argument("--config", help="chemin de .moodle-bridge/config.json (défaut : l'installation connue)")
-        p.add_argument("--engine", choices=["claude-cli", "codex-cli", "command", "none"])
+        p.add_argument("--engine", choices=["claude-cli", "codex-cli", "gemini-cli", "command", "none"])
         p.add_argument("--model", help="modèle (Claude Code : haiku, sonnet, opus ; vide : celui par défaut)")
         p.add_argument("--command", help="chemin de la commande, ou commande complète pour « command »")
         p.add_argument("--json", action="store_true")
