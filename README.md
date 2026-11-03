@@ -149,7 +149,7 @@ Tout ce que produit Moodle Bridge est un dossier de fichiers ordinaires : tes do
 
 | Note | Contenu |
 |---|---|
-| `Accueil` | la semaine à venir, les annonces récentes, les nouveaux documents, ce qui attend une action, le tableau des matières |
+| `Accueil` | « L'essentiel » (problèmes du pont, changements annoncés, semaine, examens, ce qui attend une action), puis la semaine à venir, les annonces récentes, les nouveaux documents, le tableau des matières |
 | `Matières/<CODE>` | une note par matière : échéances, annonces, modalités de contrôle, notes, puis tout le contenu section par section (textes, documents, devoirs) |
 | `Devoirs/<CODE> — <devoir>` | date limite, consignes, pièces jointes et lien de dépôt |
 | `Échéances`, `Annonces`, `Documents`, `Modalités de contrôle` | les mêmes informations, tous cours confondus |
@@ -259,6 +259,7 @@ Pour un autre agent, utilise `--dest <dossier de skills de l'agent>`. Tu n'as pa
 L'application affiche dans la barre des menus :
 - une icône d'état : à jour, en cours, en retard ou en échec ;
 - le nombre de nouveaux documents ;
+- un onglet **Essentiel** : changements annoncés (report, annulation, salle…), échéances de la semaine, examens, problèmes du pont ;
 - un panneau avec les derniers documents, les échéances et les annonces (résumé au clic) ;
 - les nouvelles notes publiées sur Moodle, en « mystère » jusqu'à ce que tu cliques pour les découvrir (facultatif, `notes.enabled`) ;
 - un onglet **IA** pour changer d'IA ou de modèle, et s'y connecter ;

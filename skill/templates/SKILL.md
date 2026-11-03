@@ -28,7 +28,7 @@ Le pont est **en lecture seule côté Moodle**. Il ne rend aucun devoir, ne post
 | Cache (téléchargements en cours, état pour l'app) | `{{CACHE}}` | rarement | non |
 | Code du pont | `{{REPO}}` | si besoin | seulement si l'utilisateur veut modifier le pont lui-même |
 
-Pour répondre à « qu'ai-je à rendre ? », « quoi de neuf ? », « que dit l'annonce ? » ou « comment est calculée la note ? », lis d'abord le coffre (`Accueil.md`, puis la note de la matière dans `Matières/`), puis les textes ou `texts --json`. N'interroge pas Moodle pour ça : tout y est déjà.
+Pour répondre à « qu'ai-je à rendre ? », « quoi de neuf ? », « que dit l'annonce ? » ou « comment est calculée la note ? », lis d'abord le coffre (`Accueil.md`, dont la section « L'essentiel » résume les changements annoncés, les examens et la semaine, puis la note de la matière dans `Matières/`), puis les textes ou `texts --json`. N'interroge pas Moodle pour ça : tout y est déjà.
 
 ## Commandes
 

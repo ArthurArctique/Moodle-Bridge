@@ -88,7 +88,7 @@ Le coffre (`vault.dir`, relatif à `<env>`) est **réécrit à chaque appel** : 
 
 | Note | Contenu |
 |---|---|
-| `Accueil` | la semaine à venir, les dernières annonces, les nouveaux documents, ce qui attend une action, un tableau des matières |
+| `Accueil` | « L'essentiel » (problèmes du pont, changements annoncés, semaine, examens et évaluations, ce qui attend une action), puis la semaine à venir, les dernières annonces, les nouveaux documents, un tableau des matières |
 | `Matières/<CODE>` | une note par matière : échéances, annonces, modalités de contrôle, notes, puis tout le contenu section par section |
 | `Devoirs/<CODE> — <devoir>` | date limite, fermeture du dépôt, consignes, pièces jointes |
 | `Échéances`, `Annonces`, `Documents`, `Modalités de contrôle` | les mêmes informations, tous cours confondus |
@@ -156,6 +156,7 @@ Le relevé des notes est une **tâche à part**, plus fréquente que la synchron
 
 L'application `~/Applications/Moodle Bridge.app` ne contacte jamais Moodle : elle lit l'état que le pont écrit dans le cache. Elle affiche :
 - l'état du pont : à jour, en cours, en retard ou en échec ;
+- l'onglet Essentiel, le même résumé que « L'essentiel » de l'accueil (`scripts/mb/essentials.py`) ;
 - les derniers documents et leur dossier ;
 - les échéances ;
 - les annonces, dont le résumé s'affiche au clic ;

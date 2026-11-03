@@ -17,12 +17,22 @@ Une petite icône dans la barre des menus. Un clic ouvre un panneau. Une fenêtr
   - synchronisation en cours ;
   - en retard (aucun passage réussi depuis longtemps) ;
   - en échec : Moodle injoignable ou jeton expiré, la raison est dans le panneau.
+- **Essentiel** (l'icône de maison, premier onglet) : ce qui compte en ce moment, sans IA.
+  - les problèmes que l'état du pont n'affiche pas : classement automatique en panne, relevé des notes en échec ;
+  - les notes à découvrir ;
+  - les **changements annoncés** : report, annulation, salle, distanciel, campus bloqué… ;
+  - les échéances des 7 prochains jours, avec une toque pour les évaluations ;
+  - les **examens et évaluations** : annonces des 14 derniers jours qui en parlent (convocation, partiel, CC, oral, restitution…), échéances jusqu'à 30 jours.
+
+  Les annonces sont triées sur leur titre, par mots-clés : un titre qui annonce un changement (« Report des CC ») compte comme changement, pas comme examen. C'est le même résumé que la section « L'essentiel » de l'accueil du coffre.
 - **Documents** : les derniers arrivés et le dossier où ils ont été rangés, un clic pour les ouvrir.
 - **Échéances** : devoirs et événements à venir.
 - **Annonces** : un clic affiche le résumé (ou le texte d'une annonce courte), un autre ouvre l'annonce sur Moodle. Le compteur de l'onglet ne montre que les annonces pas encore affichées : il disparaît dès que tu as ouvert l'onglet.
 - **Notes** (si activées) : une nouvelle note arrive en **mystère**, avec un emoji, une couleur et une énigme. Sa valeur ne s'affiche qu'au clic sur « Découvrir ».
 - **IA** : l'IA utilisée et son modèle, à changer d'un clic. Voir [Changer de modèle](ia.md#changer-de-modèle).
 - **Historique** des derniers passages et bouton **Synchroniser**, qui lance tout de suite la tâche planifiée.
+
+Quand les titres des onglets et leurs compteurs ne tiennent pas dans la largeur du panneau, Passages et IA passent en icônes, puis tous les onglets ; leur nom s'affiche au survol.
 - **Coffre** : ouvre la note d'accueil du coffre Obsidian. Si Obsidian ne connaît pas encore ce coffre, la note s'ouvre dans l'éditeur par défaut et le panneau indique quel dossier ouvrir comme coffre.
 
 Le panneau **ne contacte jamais Moodle** : il lit l'état que Moodle Bridge écrit dans `~/Library/Caches/moodle-bridge/` à chaque passage. Une seule application sert toutes les installations du Mac. Elle ne fait que lancer des commandes du pont :

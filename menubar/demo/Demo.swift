@@ -104,6 +104,9 @@ struct DemoData {
             ["at": self.ago(minutes), "code": code, "name": name, "attachment": attachment,
              "summary": summary, "summary_kind": "modèle", "url": "https://moodle.exemple.fr"] as [String: Any]
         }
+        let essential = { (row: [String: Any], exam: Bool) -> [String: Any] in
+            row.merging(["source": row["summary"] == nil ? "deadline" : "announcement", "exam": exam]) { $1 }
+        }
         var state: [String: Any] = [
             "version": 1, "generated_at": now, "slug": Self.slug, "env_name": "Mes cours",
             "env_root": dir.path, "site": "https://moodle.exemple.fr", "sitename": "Université Exemple",
@@ -133,6 +136,25 @@ struct DemoData {
                 announcement(3 * 24 * 60, "GEN", "Permanence avant le partiel",
                              "Une séance de questions-réponses a lieu mardi de 12 h à 13 h en amphi C.", false),
             ],
+            "essentials": [
+                "problems": [] as [Any], "unconfigured": [] as [Any],
+                "week": [
+                    essential(deadline(20, "STAT", "Rendu du TP 4 — régression logistique"), false),
+                    essential(deadline(51, "PROG", "Projet Python : premier jalon"), false),
+                    essential(deadline(5 * 24 + 2, "GEN", "Quiz — génétique des populations"), false),
+                ],
+                "exams": [
+                    essential(announcement(3 * 24 * 60, "GEN", "Permanence avant le partiel",
+                                           "Une séance de questions-réponses a lieu mardi de 12 h à 13 h en amphi C.",
+                                           false), true),
+                    essential(deadline(9 * 24 + 4, "ANG", "Oral : présentation d'un article"), true),
+                ],
+                "changes": [
+                    essential(announcement(55, "BIO", "Changement de salle pour le TD de jeudi",
+                                           "Le TD 4 de jeudi a lieu en salle B12 au lieu de A03. Apportez vos "
+                                           + "ordinateurs : la séance commence par une prise en main de BLAST.", false), false),
+                ],
+            ] as [String: Any],
             "history": history,
             "sync_argv": ["/usr/bin/true"], "token_argv": ["/usr/bin/true"],
             "ai": ai["current"]!, "ai_argv": ["/bin/sh", dir.appendingPathComponent("ai.sh").path],
@@ -237,8 +259,11 @@ final class Recorder {
         prepare()
         await wait(0.6)
 
+        // Essentiel : la semaine, les examens, un changement de salle
+        hold(2600)
         // Documents : deux nouveautés et un fichier à classer
-        hold(1700)
+        await click(tab(.files))
+        hold(1500)
         // Synchroniser : un passage en direct, un document de plus
         await click(target(sync: true))
         try data.write(.running)
@@ -276,7 +301,7 @@ final class Recorder {
     private func prepare() {
         let domain = ProcessInfo.processInfo.processName
         defaults.removePersistentDomain(forName: domain)
-        defaults.set(Tab.files.rawValue, forKey: "tab")
+        defaults.set(Tab.essentials.rawValue, forKey: "tab")
         defaults.set([DemoData.slug: data.start - 3 * 3600], forKey: "lastSeen")  // deux documents « nouveaux »
         defaults.set(["\(DemoData.slug)|\(DemoData.mystery)"], forKey: "seenMysteries")  // ouvrir sur Documents
 

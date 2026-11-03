@@ -441,6 +441,7 @@ def run(cfg, client, classifier=None, dry_run=False, log=print, summarizer=None)
                     context, token)
                 if getattr(classifier, "models_used", None):
                     log(f"  modèle utilisé : {', '.join(sorted(classifier.models_used))}")
+                report["classifier_answered"] = True
             except classify.ClassifierError as exc:
                 report["classifier_error"] = str(exc)
                 log(f"  ! classement automatique indisponible : {exc}")
@@ -530,6 +531,11 @@ def run(cfg, client, classifier=None, dry_run=False, log=print, summarizer=None)
         text_courses | {c["id"] for c in snap["courses"] if cfg.course(c["id"])} if cfg.texts_enabled else [])
     state["last_sync"] = util.iso_now()
     state["last_error"] = None
+    # Panne du modèle : signalée (accueil du coffre, application) jusqu'à ce qu'il réponde de nouveau
+    if report["classifier_error"]:
+        state["classify_error"] = {"message": report["classifier_error"], "at": state["last_sync"]}
+    elif report.get("classifier_answered"):
+        state["classify_error"] = None
     state["history"].append({"at": state["last_sync"], **{k: len(report[k]) for k in
                              ("new", "updated", "present", "inbox", "zotero", "imported", "errors", "removed",
                               "texts_changed")}})

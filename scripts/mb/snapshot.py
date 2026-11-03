@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import schedule, summaries, util, vault
+from . import essentials, schedule, summaries, util, vault
 
 try:
     from . import ai
@@ -75,6 +75,21 @@ def _announcement(cfg, state, ann):
             "attachment": bool(ann.get("attachment")), "summary": summary, "summary_kind": kind}
 
 
+def _essentials(cfg, state, now):
+    """« L'essentiel » pour le premier onglet ; l'application y ajoute les notes à découvrir et le retard."""
+    data = essentials.build(cfg, state, now)
+
+    def row(r, exam=False):
+        if r["source"] == "announcement":
+            return {**_announcement(cfg, state, r), "source": "announcement", "exam": exam}
+        return {"at": r["at"], "code": r["code"], "name": r["name"], "url": r.get("url"), "source": "deadline",
+                "exam": exam or r.get("exam", False)}
+
+    return {"problems": data["problems"], "week": [row(r) for r in data["week"]],
+            "exams": [row(r, True) for r in data["exams"]], "changes": [row(r) for r in data["changes"]],
+            "unconfigured": data["actions"]["unconfigured"]}
+
+
 def _argv(cfg, command):
     return [str(Path(sys.executable).resolve()), "-I", str(schedule.entry_script()), command, "--config", str(cfg.path)]
 
@@ -119,6 +134,7 @@ def build(cfg, state, now=None, running=False, scheduled=False, previous=None):
         "upcoming": upcoming(cfg, remote, now),
         "announcements": [_announcement(cfg, state, a)
                           for a in recent_announcements(remote, days, now)[:MAX_ANNOUNCEMENTS]],
+        "essentials": _essentials(cfg, state, now),
         "history": [_run(h) for h in reversed(state.get("history", [])[-MAX_RUNS:])],
         "sync_argv": _argv(cfg, "sync") + ["--quiet"],
         "token_argv": _argv(cfg, "token"),

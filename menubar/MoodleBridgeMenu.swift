@@ -41,6 +41,8 @@ struct Snapshot: Decodable, Identifiable {
     let zoteroPending: [BridgeFile]
     let upcoming: [Deadline]
     let announcements: [Announcement]
+    /// Absent d'un pont plus ancien que l'onglet Essentiel
+    let essentials: Essentials?
     let history: [Run]
     let syncArgv: [String]
     let tokenArgv: [String]
@@ -115,6 +117,44 @@ struct Announcement: Decodable, Identifiable {
         default: return ("Début de l'annonce", "text.alignleft")
         }
     }
+}
+
+/// « L'essentiel » (essentials.py) ; l'application y ajoute le relevé des notes et les notes à découvrir.
+struct Essentials: Decodable {
+    let problems: [Problem]
+    let week: [EssentialItem]
+    let exams: [EssentialItem]
+    let changes: [EssentialItem]
+    let unconfigured: [String]
+
+    struct Problem: Decodable {
+        /// « sync » (dernier passage en échec, déjà dans l'état du pont) ou « classify » (modèle en panne)
+        let kind: String
+        let message: String
+    }
+}
+
+/// Une échéance ou une annonce de « L'essentiel ».
+struct EssentialItem: Decodable, Identifiable {
+    let at: Double
+    let code: String?
+    let name: String
+    let url: String?
+    let source: String
+    let exam: Bool
+    let attachment: Bool?
+    let summary: String?
+    let summaryKind: String?
+
+    var id: String { "\(source)|\(at)|\(name)" }
+
+    var announcement: Announcement? {
+        guard source == "announcement" else { return nil }
+        return Announcement(at: at, code: code, name: name, url: url, attachment: attachment ?? false,
+                            summary: summary, summaryKind: summaryKind)
+    }
+
+    var deadline: Deadline { Deadline(at: at, code: code, name: name, url: url) }
 }
 
 struct Run: Decodable, Identifiable {
@@ -694,6 +734,21 @@ final class Bridge: ObservableObject {
 
     func isBusy(_ snap: Snapshot) -> Bool { snap.isRunning || kicked[snap.slug] != nil }
 
+    /// Problèmes que l'onglet Essentiel signale ; un passage en échec est déjà affiché par l'état du pont.
+    func alerts(_ snap: Snapshot) -> [BridgeAlert] {
+        var alerts: [BridgeAlert] = []
+        if let problem = snap.essentials?.problems.first(where: { $0.kind == "classify" }) {
+            alerts.append(BridgeAlert(id: "classify", title: "Classement automatique en panne", message: problem.message,
+                                hint: "Les fichiers que les règles ne savent pas ranger attendent dans « À classer ».",
+                                action: snap.aiArgv == nil ? nil : ("Vérifier l'IA", .ai)))
+        }
+        if let notes = notes(for: snap), notes.enabled, let error = notes.lastError {
+            alerts.append(BridgeAlert(id: "notes", title: "Relevé des notes en échec", message: error,
+                                hint: nil, action: ("Voir les notes", .notes)))
+        }
+        return alerts
+    }
+
     func health(_ snap: Snapshot) -> Health {
         if isBusy(snap) { return .running }
         if snap.lastError != nil { return .failing }
@@ -987,12 +1042,13 @@ struct MenuBarLabel: View {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case files, upcoming, news, notes, runs, ai
+    case essentials, files, upcoming, news, notes, runs, ai
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .essentials: return "Essentiel"
         case .files: return "Documents"
         case .upcoming: return "À venir"
         case .news: return "Annonces"
@@ -1002,9 +1058,32 @@ enum Tab: String, CaseIterable, Identifiable {
         }
     }
 
+    var symbol: String {
+        switch self {
+        case .essentials: return "house.fill"
+        case .files: return "doc.on.doc"
+        case .upcoming: return "calendar"
+        case .news: return "megaphone"
+        case .notes: return "graduationcap"
+        case .runs: return "clock.arrow.circlepath"
+        case .ai: return "sparkles"
+        }
+    }
+
+    /// Niveau de compacité de la barre à partir duquel l'onglet n'affiche plus que son icône : sept titres et
+    /// leurs compteurs ne tiennent pas toujours dans la largeur du panneau.
+    var iconLevel: Int {
+        switch self {
+        case .essentials: return 0
+        case .runs, .ai: return 1
+        default: return 2
+        }
+    }
+
     /// Badge en couleur pour ce qui attend une action ; gris pour un simple décompte.
     var badge: Color? {
         switch self {
+        case .essentials: return .orange
         case .files: return .blue
         case .notes: return .pink
         default: return nil
@@ -1019,11 +1098,25 @@ struct TabBar: View {
     let snap: Snapshot
 
     var body: some View {
+        // La plus lisible des barres qui tient : titres, puis Passages et IA en icônes, puis tout en icônes
+        ViewThatFits(in: .horizontal) {
+            bar(level: 0)
+            bar(level: 1)
+            bar(level: 2)
+        }
+    }
+
+    private func bar(level: Int) -> some View {
         HStack(spacing: 2) {
             ForEach(Tab.allCases.filter { $0 != .ai || snap.aiArgv != nil }) { tab in
+                let icon = tab.iconLevel <= level
                 Button { selection = tab } label: {
                     HStack(spacing: 4) {
-                        Text(tab.title).lineLimit(1)
+                        if icon {
+                            Image(systemName: tab.symbol).accessibilityLabel(tab.title)
+                        } else {
+                            Text(tab.title).lineLimit(1)
+                        }
                         if let count = count(tab), count > 0 {
                             Text("\(count)")
                                 .font(.caption2.weight(.semibold).monospacedDigit())
@@ -1044,6 +1137,7 @@ struct TabBar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(icon ? tab.title : "")
             }
         }
         .padding(2)
@@ -1052,6 +1146,7 @@ struct TabBar: View {
 
     private func count(_ tab: Tab) -> Int? {
         switch tab {
+        case .essentials: return bridge.alerts(snap).count
         case .files: return bridge.unread(snap)
         case .upcoming: return snap.upcoming.filter { $0.at >= bridge.now.timeIntervalSince1970 - 3600 }.count
         case .news: return bridge.unreadNews(snap)
@@ -1063,7 +1158,7 @@ struct TabBar: View {
 
 struct PanelView: View {
     @EnvironmentObject var bridge: Bridge
-    @AppStorage("tab") private var tab = Tab.files
+    @AppStorage("tab") private var tab = Tab.essentials
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1080,6 +1175,7 @@ struct PanelView: View {
                 ScrollView {
                     Group {
                         switch tab {
+                        case .essentials: EssentialsView(snap: snap, tab: $tab)
                         case .files: FilesList(snap: snap)
                         case .upcoming: DeadlinesList(snap: snap)
                         case .news: AnnouncementsList(snap: snap)
@@ -1390,6 +1486,177 @@ struct FileRow: View {
     }
 }
 
+struct BridgeAlert: Identifiable {
+    let id: String
+    let title: String
+    let message: String
+    let hint: String?
+    let action: (label: String, tab: Tab)?
+}
+
+/// Premier onglet : problèmes, notes à découvrir, changements annoncés, la semaine, les examens. Les fichiers à
+/// classer ou pour Zotero n'y figurent pas : l'état du pont, juste au-dessus, les affiche déjà.
+struct EssentialsView: View {
+    @EnvironmentObject var bridge: Bridge
+    let snap: Snapshot
+    @Binding var tab: Tab
+    @State private var expanded: Set<String> = []
+
+    var body: some View {
+        let now = bridge.now.timeIntervalSince1970
+        let data = snap.essentials
+        let week = (data?.week ?? []).filter { $0.at >= now - 3600 }
+        let exams = (data?.exams ?? []).filter { $0.source == "announcement" || $0.at >= now - 3600 }
+        let changes = data?.changes ?? []
+        let alerts = bridge.alerts(snap)
+        let todo = todo(data)
+        LazyVStack(alignment: .leading, spacing: 10) {
+            if data == nil {
+                Placeholder(text: "Résumé indisponible : il apparaîtra après le prochain passage.")
+            } else if alerts.isEmpty && todo.isEmpty && week.isEmpty && exams.isEmpty && changes.isEmpty
+                        && snap.counts.inbox + snap.counts.zoteroPending == 0 {
+                Placeholder(text: "Rien d'important pour l'instant : aucune échéance dans les 7 jours, "
+                            + "aucun examen ni changement annoncé.")
+            } else {
+                ForEach(alerts) { AlertCard(alert: $0, tab: $tab) }
+                if !todo.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(todo, id: \.text) { item in
+                            if let target = item.tab {
+                                Button { tab = target } label: { Chip(text: item.text, symbol: item.symbol, tint: item.tint) }
+                                    .buttonStyle(.plain)
+                            } else {
+                                Chip(text: item.text, symbol: item.symbol, tint: item.tint)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                }
+                if !changes.isEmpty {
+                    section("Changements annoncés", symbol: "exclamationmark.triangle") { rows(changes) }
+                }
+                section("Cette semaine", symbol: "calendar") {
+                    ForEach(week) { DeadlineRow(deadline: $0.deadline, exam: $0.exam) }
+                    if week.isEmpty {
+                        Text("Aucune échéance dans les 7 jours.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                    }
+                }
+                if !exams.isEmpty {
+                    section("Examens et évaluations", symbol: "graduationcap") { rows(exams) }
+                }
+            }
+        }
+    }
+
+    private func section<Content: View>(_ title: String, symbol: String,
+                                        @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Label(title, systemImage: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.bottom, 2)
+            content()
+        }
+    }
+
+    @ViewBuilder
+    private func rows(_ items: [EssentialItem]) -> some View {
+        ForEach(items) { item in
+            if let ann = item.announcement {
+                AnnouncementRow(ann: ann, expanded: expanded.contains(item.id)) {
+                    if expanded.contains(item.id) { expanded.remove(item.id) } else { expanded.insert(item.id) }
+                }
+            } else {
+                DeadlineRow(deadline: item.deadline)
+            }
+        }
+    }
+
+    private struct Todo {
+        let text: String
+        let symbol: String
+        let tint: Color
+        let tab: Tab?
+    }
+
+    private func todo(_ data: Essentials?) -> [Todo] {
+        var items: [Todo] = []
+        let mysteries = bridge.notes(for: snap).map(bridge.mysteries) ?? 0
+        if mysteries > 0 {
+            items.append(Todo(text: mysteries == 1 ? "1 note à découvrir" : "\(mysteries) notes à découvrir",
+                              symbol: "gift", tint: .pink, tab: .notes))
+        }
+        if let courses = data?.unconfigured, !courses.isEmpty {
+            items.append(Todo(text: "\(courses.count) cours non configuré\(courses.count > 1 ? "s" : "")",
+                              symbol: "questionmark.folder", tint: .secondary, tab: nil))
+        }
+        return items
+    }
+}
+
+struct AlertCard: View {
+    let alert: BridgeAlert
+    @Binding var tab: Tab
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(alert.title, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text(alert.message)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                if let hint = alert.hint {
+                    Text(hint).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                if let action = alert.action {
+                    Button(action.label) { tab = action.tab }.buttonStyle(.link).font(.caption2)
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.orange.opacity(0.1)))
+    }
+}
+
+struct DeadlineRow: View {
+    @EnvironmentObject var bridge: Bridge
+    let deadline: Deadline
+    var exam = false
+
+    var body: some View {
+        RowButton(action: { bridge.openURL(deadline.url) }) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(Fmt.dayTime.string(from: Fmt.date(deadline.at)))
+                        .font(.caption.monospacedDigit())
+                    Text(Fmt.until(deadline.at, now: bridge.now))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Fmt.urgency(deadline.at, now: bridge.now))
+                }
+                .frame(width: 112, alignment: .leading)
+                CodeBadge(code: deadline.code)
+                if exam {
+                    Image(systemName: "graduationcap.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                        .help("Examen ou évaluation")
+                }
+                Text(deadline.name).font(.callout).lineLimit(2)
+            }
+        }
+        .help(deadline.name)
+    }
+}
+
 struct DeadlinesList: View {
     @EnvironmentObject var bridge: Bridge
     let snap: Snapshot
@@ -1397,23 +1664,7 @@ struct DeadlinesList: View {
     var body: some View {
         let rows = snap.upcoming.filter { $0.at >= bridge.now.timeIntervalSince1970 - 3600 }
         LazyVStack(alignment: .leading, spacing: 1) {
-            ForEach(rows) { deadline in
-                RowButton(action: { bridge.openURL(deadline.url) }) {
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(Fmt.dayTime.string(from: Fmt.date(deadline.at)))
-                                .font(.caption.monospacedDigit())
-                            Text(Fmt.until(deadline.at, now: bridge.now))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(Fmt.urgency(deadline.at, now: bridge.now))
-                        }
-                        .frame(width: 112, alignment: .leading)
-                        CodeBadge(code: deadline.code)
-                        Text(deadline.name).font(.callout).lineLimit(2)
-                    }
-                }
-                .help(deadline.name)
-            }
+            ForEach(rows) { DeadlineRow(deadline: $0) }
             if rows.isEmpty { Placeholder(text: "Aucune échéance annoncée par Moodle.") }
         }
     }

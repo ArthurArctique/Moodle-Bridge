@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from mb import api, classify, config, fetch, index, credentials, sync, vault  # noqa: E402
+from mb import api, classify, config, essentials, fetch, index, credentials, sync, vault  # noqa: E402
 
 try:
     from mb import snapshot  # noqa: E402
@@ -359,6 +359,13 @@ class SyncTests(unittest.TestCase):
         report = sync.run(cfg, client, Broken(), log=quiet)
         self.assertEqual(report["inbox"], ["10/201/x.pdf"])
         self.assertEqual(report["classifier_error"], "hors ligne")
+        # La panne reste signalée tant que le modèle n'a pas répondu de nouveau
+        self.assertEqual(sync.load_state(cfg.state_path)["classify_error"]["message"], "hors ligne")
+        sync.run(cfg, client, None, log=quiet)
+        self.assertEqual(sync.load_state(cfg.state_path)["classify_error"]["message"], "hors ligne")
+        client.add_file(202, "y.pdf", b"Y", section="Inconnue")
+        sync.run(cfg, client, FakeClassifier(json.dumps({"placements": []})), log=quiet)
+        self.assertIsNone(sync.load_state(cfg.state_path)["classify_error"])
 
     def test_routes_and_zotero(self):
         tmp, cfg = make_env(
@@ -610,6 +617,11 @@ class VaultTests(unittest.TestCase):
         self.assertIn("[[Tableau de bord/Devoirs/TST — Rendu projet\\|Rendu projet doit être rendu]]", home)
         self.assertIn("(demain)", home)
         self.assertNotIn("Notes", home.split("\n## ")[0])  # pas de page Notes sans relevé des notes
+        essential = home.split("## L'essentiel")[1].split("\n## ")[0]
+        self.assertIn("📅 **Cette semaine** : 1 échéance, la prochaine demain", essential)
+        self.assertIn("[[#Cette semaine|détail]]", essential)
+        self.assertIn("fichier(s) à classer", essential)  # « En attente » a rejoint « L'essentiel »
+        self.assertNotIn("## En attente", home)
 
         subject = (board / "Matières/TST.md").read_text()
         for expected in ('type: "moodle-matiere"', "## Modalités de contrôle",
@@ -623,6 +635,26 @@ class VaultTests(unittest.TestCase):
         news = (board / "Annonces.md").read_text()
         self.assertIn("Salle B12.", news)
         self.assertNotIn("Résumé (IA)", news)  # aucun résumé sans IA
+
+    def test_essentials_on_home(self):
+        tmp, cfg, _client = self._sync()
+        now = int(time.time())
+        state = sync.load_state(cfg.state_path)
+        state["remote"]["announcements"] += [
+            {"courseid": 10, "course": "M1_TST", "name": "TP de jeudi reporté", "time": now - 3600, "url": "https://m/r"},
+            {"courseid": 10, "course": "M1_TST", "name": "Convocation au partiel", "time": now - 7200, "url": "https://m/c"}]
+        state["classify_error"] = {"message": "agy n'a rien répondu", "at": "2026-11-04T08:00:00+01:00"}
+        state["last_error"] = "Moodle injoignable"
+        vault.write(cfg, state, now)
+        home = (tmp / "Vault/Tableau de bord/Accueil.md").read_text()
+        essential = home.split("## L'essentiel")[1].split("\n## ")[0]
+        self.assertIn("> [!warning] Dernier passage en échec : Moodle injoignable", essential)
+        self.assertIn("Classement automatique en panne depuis le", essential)
+        changes, exams = essential.index("Changements annoncés"), essential.index("Examens et évaluations")
+        self.assertLess(changes, essential.index("TP de jeudi reporté"))
+        self.assertLess(essential.index("TP de jeudi reporté"), essential.index("Cette semaine"))
+        self.assertLess(exams, essential.index("Convocation au partiel"))
+        self.assertEqual(home.count("Dernier passage en échec"), 1)  # plus d'avertissement en tête de page
 
     def test_files_inside_vault_use_relative_links(self):
         tmp, cfg = make_env(courses={"10": {"dest": "Vault/Cours", "code": "TST", "mode": "mirror"}},
@@ -700,6 +732,59 @@ class VaultTests(unittest.TestCase):
         self.assertFalse((board / "Notes.md").exists())
 
 
+class EssentialsTests(unittest.TestCase):
+    """« L'essentiel » : tri des annonces par mots-clés du titre, sans modèle de langage."""
+
+    def test_keywords(self):
+        for title in ("TP SIR/PAR PNB : reporté", "Blocage ce matin : ne pas venir !", "Report des CCs prévus",
+                      "Annulation des oraux de projet", "TD 15/10 en visio", "Changement de salle pour le TD",
+                      "Pas de visio cet après-midi", "Mouvement de grève", "Passage en distanciel synchrone",
+                      "[Urgent] TP du 09/10", "Campus bloqué ce lundi matin", "Nouvelle date pour le CC"):
+            self.assertTrue(essentials.is_change(title), title)
+        for title in ("Offres de stage en ligne", "Lien visio PNB 21/10", "Fermentation alcoolique",
+                      "Échange avec l'équipe", "Organisation de la semaine", "Rapport à rendre"):
+            self.assertFalse(essentials.is_change(title), title)
+        for title in ("Convocation au TP noté", "Planning des restitutions", "Partiel de génétique", "CC1 mardi",
+                      "QCM final", "Soutenance de stage", "Oral : présentation d'un article", "Examen de rattrapage",
+                      "Projet noté : consignes"):
+            self.assertTrue(essentials.is_exam(title), title)
+        for title in ("Notes TP noté BOB", "Évaluation des enseignements", "Devoir Maison", "Quiz 3",
+                      "Notes de l'examen"):
+            self.assertFalse(essentials.is_exam(title), title)
+
+    def test_build(self):
+        tmp, cfg = make_env()
+        now = int(time.time())
+        day = 86400
+        ann = lambda name, age, course=10: {"courseid": course, "course": "M1_TST", "name": name,  # noqa: E731
+                                            "time": now - age, "url": name}
+        due = lambda name, days, cmid: {"courseid": 10, "course": "M1_TST", "name": name,  # noqa: E731
+                                        "duedate": now + days * day, "url": name, "cmid": cmid}
+        state = sync.empty_state()
+        state["items"] = {"a": {"status": "inbox"}, "b": {"status": "inbox"}, "c": {"status": "zotero_pending"},
+                          "d": {"status": "placed"}}
+        state["remote"] = {"courses": [], "events": [], "unconfigured": {"99": "Autre cours"},
+                           "announcements": [ann("TP reporté", 3600), ann("Report du partiel", 10 * day),
+                                             ann("Convocation au partiel", 10 * day), ann("Partiel 2024", 20 * day),
+                                             ann("Cours annulé", 60, course=99), ann("Organisation", 60)],
+                           "assignments": [due("Rendu TP", 2, 1), due("Projet noté", 3, 2), due("Examen final", 20, 3),
+                                           due("Rapport", 20, 4), due("Soutenance", 40, 5)]}
+        state["classify_error"] = {"message": "agy n'a rien répondu", "at": "2026-11-04T08:00:00+01:00"}
+        data = essentials.build(cfg, state, now, mysteries=2)
+
+        self.assertEqual([(r["name"], r["exam"]) for r in data["week"]],
+                         [("Rendu TP (date limite)", False), ("Projet noté (date limite)", True)])
+        # Annonces d'abord, puis les échéances après la semaine et jusqu'à 30 jours
+        self.assertEqual([r["name"] for r in data["exams"]], ["Convocation au partiel", "Examen final (date limite)"])
+        # Un changement trop ancien n'est pas repris comme examen ; un cours non suivi est ignoré
+        self.assertEqual([r["name"] for r in data["changes"]], ["TP reporté"])
+        self.assertEqual(data["actions"], {"inbox": 2, "zotero_pending": 1, "mysteries": 2,
+                                           "unconfigured": ["Autre cours"]})
+        self.assertEqual([p["kind"] for p in data["problems"]], ["classify"])
+        self.assertFalse(essentials.is_empty(data))
+        self.assertTrue(essentials.is_empty(essentials.build(cfg, sync.empty_state(), now)))
+
+
 @unittest.skipIf(snapshot is None, "édition sans application de barre des menus")
 class SnapshotTests(unittest.TestCase):
     def _item(self, name, placed_at, status="placed", folder="Cours/TST/TD/TD03"):
@@ -737,6 +822,10 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual([r["ok"] for r in snap["history"]], [False, True])  # le plus récent d'abord
         self.assertEqual(snap["counts"], {"tracked": 32, "inbox": 0, "zotero_pending": 1})
         self.assertIn("token", snap["token_argv"])
+        self.assertEqual([(r["name"], r["source"]) for r in snap["essentials"]["changes"]],
+                         [("Salle changée", "announcement")])
+        self.assertEqual([(r["name"], r["code"], r["exam"]) for r in snap["essentials"]["week"]],
+                         [("Rendu TP", "TST", False)])
 
         snapshot.write(cfg, sync.load_state(cfg.state_path), now=now + 60)
         snap = snapshot.read(cfg)

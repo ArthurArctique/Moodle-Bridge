@@ -1,6 +1,7 @@
 """Coffre Obsidian : le contenu de Moodle rangé en notes reliées entre elles, régénéré à chaque passage.
 
-- `Accueil` : la semaine à venir, les dernières annonces, les nouveaux documents, ce qui attend une action ;
+- `Accueil` : « L'essentiel » (problèmes du pont, semaine, examens, changements annoncés, ce qui attend une
+  action), puis la semaine à venir, les dernières annonces, les nouveaux documents ;
 - `Matières/<CODE>` : une note par matière (un cours Moodle, ou la partie qu'une route envoie dans un autre
   dossier) avec ses échéances, annonces, modalités de contrôle, notes et tout son contenu, section par section ;
 - `Devoirs/<CODE> — <devoir>` : date limite, consignes et pièces jointes de chaque devoir ;
@@ -21,7 +22,7 @@ from collections import OrderedDict, defaultdict
 from datetime import date, datetime
 from pathlib import Path
 
-from . import summaries, texts, util
+from . import essentials, summaries, texts, util
 from .fetch import browser_url
 from .index import INITIAL_IMPORT_THRESHOLD, esc, recent_announcements, upcoming
 
@@ -346,9 +347,8 @@ class Vault:
                   f"> [!info] Généré par Moodle Bridge depuis {self.cfg.site} — dernière synchronisation : "
                   f"{util.fmt_date(last, with_time=True) if last else 'jamais'}.",
                   "> Ces notes sont réécrites à chaque passage : écris les tiennes à côté, elles ne sont jamais touchées."]
-        if self.state.get("last_error"):
-            lines += ["", f"> [!warning] Dernier passage en échec : {esc(self.state['last_error'])}"]
         lines += ["", " · ".join(self.link(p, p) for p in self.pages if p != HOME)]
+        lines += ["", "## L'essentiel", ""] + self.essentials()
 
         week = [r for r in self.deadlines if r["at"] <= self.now + WEEK]
         lines += ["", "## Cette semaine", ""]
@@ -370,23 +370,6 @@ class Vault:
         lines += ["", f"## Nouveaux documents ({self.days} derniers jours)", ""]
         lines += self.news_lines(f"{HOME}.md", self.days)
 
-        waiting = []
-        counts = defaultdict(int)
-        for entry in self.items.values():
-            counts[entry.get("status")] += 1
-        if counts["inbox"]:
-            waiting.append(f"- {counts['inbox']} fichier(s) à classer : {self.link(DOCUMENTS + '#À classer', 'Documents')}")
-        if counts["zotero_pending"]:
-            waiting.append(f"- {counts['zotero_pending']} support(s) de cours à importer dans Zotero : "
-                           f"{self.link(DOCUMENTS + '#À importer dans Zotero', 'Documents')}")
-        mysteries = sum(1 for rows in (self.grades or {}).values() for e in rows if e.get("status") == "mystery")
-        if mysteries:
-            waiting.append(f"- {mysteries} note(s) à découvrir dans l'application : {self.link(GRADES, GRADES)}")
-        unconfigured = self.remote.get("unconfigured") or {}
-        if unconfigured:
-            waiting.append(f"- cours non configuré(s), fichiers ignorés : {esc(', '.join(sorted(map(str, unconfigured.values()))))}")
-        lines += ["", "## En attente", ""] + (waiting or ["Rien n'attend d'action."])
-
         rows = []
         for code, subject in self.subjects.items():
             data = self.by_subject[code]
@@ -399,6 +382,82 @@ class Vault:
         lines += table(["Matière", "Intitulé", "Documents", "Devoirs à rendre", "Prochaine échéance"], rows) or [
             "Aucun cours suivi."]
         return lines
+
+    def essentials(self):
+        """Section « L'essentiel » de l'accueil : ce qui demande de l'attention, en quelques lignes."""
+        mysteries = sum(1 for rows in (self.grades or {}).values() for e in rows if e.get("status") == "mystery")
+        data = essentials.build(self.cfg, self.state, self.now, mysteries)
+        if essentials.is_empty(data):
+            return ["Rien d'important pour l'instant : aucune échéance dans les 7 jours, aucun examen ni changement "
+                    "annoncé, rien n'attend d'action."]
+        lines = []
+        for problem in data["problems"]:
+            if problem["kind"] == "sync":
+                lines += [f"> [!warning] Dernier passage en échec : {esc(problem['message'])}", ""]
+            else:
+                since = util.parse_iso(problem.get("at"))
+                lines += [f"> [!warning] Classement automatique en panne"
+                          f"{' depuis le ' + util.fmt_date(since, with_time=True) if since else ''} : "
+                          f"{esc(problem['message'])}",
+                          "> Les fichiers que les règles ne savent pas ranger attendent dans « À classer ».", ""]
+
+        lines += self.essential_list("⚠️ **Changements annoncés**", data["changes"])
+        lines += self.week_line(data["week"])
+        lines += self.essential_list("🎓 **Examens et évaluations**", data["exams"])
+
+        actions = data["actions"]
+        todo = []
+        if actions["inbox"]:
+            todo.append(self.link(DOCUMENTS + "#À classer", f"{actions['inbox']} fichier(s) à classer"))
+        if actions["zotero_pending"]:
+            todo.append(self.link(DOCUMENTS + "#À importer dans Zotero",
+                                  f"{actions['zotero_pending']} support(s) à importer dans Zotero"))
+        if actions["mysteries"]:
+            todo.append(self.link(GRADES, f"{actions['mysteries']} note(s) à découvrir dans l'application"))
+        if actions["unconfigured"]:
+            todo.append(f"cours non configuré(s), fichiers ignorés : {esc(', '.join(actions['unconfigured']))}")
+        if todo:
+            lines.append(f"- 📥 **À faire** : {' · '.join(todo)}")
+        return lines
+
+    def essential_list(self, title, rows):
+        if not rows:
+            return []
+        lines = [f"- {title} :"]
+        for row in rows[:essentials.MAX_ROWS]:
+            lines.append(f"    - {self.essential_row(row)}")
+            if row["source"] == "announcement":
+                summary, kind = summaries.for_snapshot(self.summaries, self.texts_by_id, row)
+                if summary and kind in ("modèle", "texte"):
+                    lines.append(f"        > {'🤖 ' if kind == 'modèle' else ''}{esc(summary)}")
+        if len(rows) > essentials.MAX_ROWS:
+            more = len(rows) - essentials.MAX_ROWS
+            lines.append(f"    - et {more} autre{'s' if more > 1 else ''} : "
+                         f"{self.link(NEWS, NEWS)}, {self.link(DEADLINES, DEADLINES)}")
+        return lines
+
+    def week_line(self, week):
+        if not week:
+            return ["- 📅 **Cette semaine** : aucune échéance."]
+        first = week[0]
+        exams = sum(1 for row in week if row["exam"])
+        return [f"- 📅 **Cette semaine** : {len(week)} échéance{'s' if len(week) > 1 else ''}"
+                f"{f' dont {exams} évaluation' + ('s' if exams > 1 else '') if exams else ''}, "
+                f"la prochaine {until(first['at'], self.now)} : {self.essential_row(first, relative=False)}"
+                f" — [[#Cette semaine|détail]]"]
+
+    def essential_row(self, row, relative=True):
+        """Une échéance ou une annonce de « L'essentiel », sur une ligne de liste."""
+        if row["source"] == "announcement":
+            code = self.subject_of(row["courseid"])
+            clip = " · 📎" if row.get("attachment") else ""
+            return f"{when(row['at'])} · {self.subject_link(code)} · annonce : {web(row.get('url'), row.get('name'))}{clip}"
+        code = self.subject_of(row["courseid"], row.get("section"))
+        what = (self.link(self.assignment_notes[row["cmid"]], row["name"])
+                if row.get("cmid") in self.assignment_notes else esc(row["name"]))
+        moodle = f" · {web(row['url'], 'Moodle')}" if row.get("url") else ""
+        moment = when(row["at"]) + (f" ({until(row['at'], self.now)})" if relative else "")
+        return f"{moment} · {self.subject_link(code)} · {what}{moodle}"
 
     def news_lines(self, here, days):
         recent = [e for e in self.items.values()
