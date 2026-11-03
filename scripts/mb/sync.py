@@ -405,13 +405,19 @@ def run(cfg, client, classifier=None, dry_run=False, log=print, summarizer=None)
                 known.append({**remote[key], "dest_dir": decision["dest_dir"]})
         return known
 
-    # Voisins : répété tant que de nouveaux placements servent d'exemples
+    # Voisins et séances évidentes (« GNF_TD2_… » → TD/TD02) : répété tant que de nouveaux placements servent
+    # d'exemples, si bien qu'un fichier sans numéro (matrix2.txt) suit ceux de son activité
     progress = True
     while progress and pending:
         progress = False
         known = evidence()
+        same_course = {}
         for key in list(pending):
-            found = classify.sibling_dest(pending[key], known, inbox)
+            root = cfg.conf_for(pending[key])["root"]
+            if root not in same_course:
+                same_course[root] = [e for e in known if (cfg.conf_for(e) or {}).get("root") == root]
+            found = classify.sibling_dest(pending[key], known, inbox) or classify.session_dest(
+                pending[key], root, settings["new_dir_patterns"], inbox, same_course[root])
             if found:
                 decisions[key] = {"action": "copy", "dest_dir": found[0], "decided_by": found[1]}
                 del pending[key]

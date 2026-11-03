@@ -45,7 +45,7 @@ Le détail est dans `classement.md`. L'ordre des règles :
 3. déjà présent (empreinte SHA-256) ;
 4. correction (`overrides`) ;
 5. miroir (mode `mirror`) ;
-6. voisins (au moins deux fichiers de la même activité déjà rangés dans un même dossier) ;
+6. voisins (au moins deux fichiers de la même activité déjà rangés dans un même dossier), puis séance évidente (l'activité ou le fichier nomme un seul TD ou TP, sans contradiction ni numérotation locale divergente) ;
 7. modèle (dossier validé, confiance ≥ `min_confidence`) ;
 8. boîte d'attente (`classify.inbox`, `_a_classer` par défaut).
 

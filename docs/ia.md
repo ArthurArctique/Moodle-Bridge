@@ -2,7 +2,7 @@
 
 Moodle Bridge fonctionne très bien sans IA : la synchronisation et le coffre Obsidian n'en ont jamais besoin. Si tu en branches une, elle sert à **trois choses seulement** :
 
-1. **Ranger les fichiers ambigus** des cours en mode `classify`. Moodle range souvent « TP du 1er octobre » ou « Supports 2026 » là où tu voudrais `TD/TD03` ou `CM/CM02`. Les règles sûres passent d'abord : fichier déjà présent, voisins déjà rangés, corrections. L'IA ne tranche que ce qui reste, et sa réponse est vérifiée : dossier autorisé, sous le cours, confiance suffisante. Sinon, le fichier va dans `_a_classer/`.
+1. **Ranger les fichiers ambigus** des cours en mode `classify`. Moodle range souvent « TP du 1er octobre » ou « Supports 2026 » là où tu voudrais `TD/TD03` ou `CM/CM02`. Les règles sûres passent d'abord : fichier déjà présent, voisins déjà rangés, séance évidente (« TD2 » dans le nom de l'activité → `TD/TD02`), corrections. L'IA ne tranche que ce qui reste, et sa réponse est vérifiée : dossier autorisé, sous le cours, confiance suffisante. Sinon, le fichier va dans `_a_classer/`.
 2. **Résumer les annonces longues** en quelques lignes, dans le coffre Obsidian et dans l'application macOS.
 3. **Habiller les notes mystère** (édition `main`) : un emoji, une couleur et une énigme.
 

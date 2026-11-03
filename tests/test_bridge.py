@@ -144,6 +144,55 @@ class ClassifyTests(unittest.TestCase):
         with self.assertRaises(classify.ClassifierError):
             classify.parse_answer("pas de json")
 
+    def test_session_of(self):
+        item = lambda section, module, filename: {"section": section, "module": module, "filename": filename}  # noqa: E731
+        self.assertEqual(classify.session_of(item("Interventions de X", "GNF_TD2_2026-2027", "matrix2.txt")), ("TD", 2))
+        self.assertEqual(classify.session_of(item("Séance", "Sujet", "tp_03-enonce.pdf")), ("TP", 3))
+        self.assertEqual(classify.session_of(item("TD 4", "TD4 - données", "TD04.csv")), ("TD", 4))
+        for case in (item("TD 4", "Sujet", "sujet.pdf"),                    # la section seule ne suffit pas
+                     item("S", "GNF_TD2_2026-2027", "TD1_part7.R"),          # deux numéros
+                     item("Practicals 5-6", "Sujet séance 5-6", "TD5-6.pdf"),  # intervalle, et TP contre TD
+                     item("TP du 21 septembre", "Sujet TD1", "td1.pdf"),     # deux types
+                     item("CM", "CM2", "CM2.pdf"),                           # CM : au modèle (Zotero ?)
+                     item("S", "Rendu 2026", "TD_2026.pdf"),                 # une année n'est pas un numéro
+                     item("S", "ATP3", "HTTP2.pdf")):
+            self.assertIsNone(classify.session_of(case), case)
+
+    def test_session_dest(self):
+        tmp, cfg = make_env()
+        root = tmp / "Cours/TST"
+        patterns = config.DEFAULTS["classify"]["new_dir_patterns"]
+        item = lambda module, filename="f.pdf": {"section": "S", "module": module, "filename": filename}  # noqa: E731
+        dest = lambda it, known=(): classify.session_dest(it, root, patterns, "_a_classer", known)  # noqa: E731
+        self.assertEqual(dest(item("TD3")), ("TD/TD03", "séance évidente"))  # dossier existant
+        self.assertEqual(dest(item("TD 12")), ("TD/TD12", "séance évidente"))  # formé comme TD/TD03
+        self.assertEqual(dest(item("TP_2")), ("TP/TP02", "séance évidente"))  # forme par défaut
+        (root / "TP" / "TP 1").mkdir(parents=True)
+        self.assertEqual(dest(item("TP 4")), ("TP/TP04", "séance évidente"))  # forme locale non autorisée
+        self.assertEqual(classify.session_dest(item("TP 4"), root, patterns + [r"TP/TP \d+"], "_a_classer"),
+                         ("TP/TP 4", "séance évidente"))  # forme locale autorisée
+        self.assertIsNone(classify.session_dest(item("TD5"), root, [], "_a_classer"))  # dossier non autorisé
+        # Numérotation locale différente de celle de Moodle : la règle s'efface pour ce type de séance
+        shifted = [{"section": "S", "module": "Sujet TD1", "filename": "a.pdf", "dest_dir": "TD/TD03"}]
+        self.assertIsNone(dest(item("TD3"), shifted))
+        self.assertEqual(dest(item("TP_2"), shifted), ("TP/TP02", "séance évidente"))
+
+    def test_second_request_after_unusable_answer(self):
+        tmp, cfg = make_env()
+        conf = {"root": tmp / "Cours/TST", "code": "TST"}
+        settings = {**config.DEFAULTS["classify"], "inbox": "_a_classer"}
+        pending = [{"key": "10/1/a.pdf", "section": "S", "module": "M", "modname": "resource",
+                    "filename": "a.pdf", "timemodified": T0}]
+        good = json.dumps({"placements": [{"id": "1", "dest": "TD/TD03", "confidence": 0.9, "reason": "r"}]})
+        answers = iter(["", good])
+        classifier = FakeClassifier(lambda prompt: next(answers))
+        accepted, _ = classify.classify_course(classifier, conf, "Test", pending, [], settings, "")
+        self.assertEqual(accepted["10/1/a.pdf"]["dest_dir"], "TD/TD03")
+        self.assertIn("Rappel", classifier.prompts[1])
+        with self.assertRaises(classify.NoAnswer):
+            classify.classify_course(FakeClassifier("je regarde les fichiers…"), conf, "Test", pending, [],
+                                     settings, "")
+
     def test_dest_dir_strips_folder_subpath(self):
         root = Path("/r")
         self.assertEqual(classify.dest_dir_for(root, "/r/TD/TD03/data/a.csv", "/data/"), "TD/TD03")
@@ -282,6 +331,21 @@ class SyncTests(unittest.TestCase):
         self.assertEqual((target_dir / "a.pdf").read_bytes(), b"version locale annotee")
         again, how = sync.place(src, target_dir, "a.pdf", digest, T0, local)
         self.assertEqual((again, how), (path, "present"))
+
+    def test_obvious_session_without_model(self):
+        tmp, cfg = make_env()
+        client = FakeClient()
+        for name in ("TD2_script.R", "matrix2.txt", "metadata2.txt", "TD1_part7.R"):
+            client.add_file(301, name, name.encode(), section="Interventions de X", module="TST_TD2_2026-2027",
+                            mimetype="text/plain")
+        report = sync.run(cfg, client, None, log=quiet)
+        self.assertEqual(report["inbox"], [])
+        items = sync.load_state(cfg.state_path)["items"]
+        root = tmp / "Cours/TST"
+        for name in ("TD2_script.R", "matrix2.txt", "metadata2.txt", "TD1_part7.R"):
+            self.assertTrue((root / "TD/TD02" / name).exists(), name)
+        self.assertEqual(items["10/301/matrix2.txt"]["decided_by"], "séance évidente")
+        self.assertEqual(items["10/301/TD1_part7.R"]["decided_by"], "voisins")  # TD1 dans le dossier du TD2
 
     def test_classifier_failure_goes_to_inbox(self):
         tmp, cfg = make_env()

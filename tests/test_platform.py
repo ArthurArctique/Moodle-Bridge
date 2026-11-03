@@ -156,6 +156,15 @@ class EnginesTest(unittest.TestCase):
             with self.assertRaisesRegex(llm.EngineError, "quota"):
                 engine.ask("x")
 
+    def test_antigravity_empty_answer_names_the_refused_action(self):
+        empty = json.dumps({"event": "result", "result": {
+            "status": "SUCCESS", "response": "", "denied_actions": [{"action": "read_file", "display_name": "ReadFile"}]}})
+        with mock.patch.object(llm, "_run", lambda *a: mock.Mock(stdout=empty)), \
+                mock.patch.object(llm, "_resolve", lambda c: c):
+            engine = llm.make_engine({"engine": "gemini-cli", "command": "/x/agy"}, "s")
+            with self.assertRaisesRegex(llm.NoAnswer, "ReadFile"):
+                engine.ask("x")
+
     def test_gemini_cli_reads_json_response(self):
         def fake_run(args, prompt, timeout, cwd, what):
             self.assertEqual(args[:3], ["/x/gemini", "--output-format", "json"])

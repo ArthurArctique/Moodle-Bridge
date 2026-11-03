@@ -15,10 +15,25 @@ Les sections Moodle correspondent rarement une à une à l'arborescence locale :
 | 5 | Plan relu | décision de la dernière simulation, même empreinte | décision reprise |
 | 6 | Version précédente | nouvelle version d'un fichier déjà rangé | même dossier, nom suffixé |
 | 7 | Voisins | au moins deux fichiers déjà rangés de la même activité, tous dans le même dossier | ce dossier |
+| 7 bis | Séance évidente | l'activité ou le fichier nomme un seul TD ou TP (« GNF_TD2_2026-2027 », « tp_03-enonce.pdf ») et rien ne le contredit | dossier de cette séance (`TD/TD02`), validé par `new_dir_patterns` |
 | 8 | Modèle | `classify.engine` différent de `none` | dossier validé si confiance ≥ `min_confidence` |
 | 9 | Boîte d'attente | aucun des cas ci-dessus | `<dest>/<inbox>/` |
 
 La règle des voisins est rejouée tant qu'elle produit de nouveaux placements : un fichier rangé sert d'exemple aux suivants. Elle ne s'appuie jamais sur la section seule ni sur un exemple unique : une section « Interventions de X » ou « CM 2026-2027 » regroupe plusieurs séances, et généraliser un seul exemple rangerait CM2 avec CM1. Ces cas vont au modèle, qui reçoit les mêmes exemples et peut en tirer la correspondance section → dossier quand elle existe.
+
+### Séance évidente
+
+Quand le nom de l'activité ou du fichier désigne sans ambiguïté un TD ou un TP, le pont range le fichier sans modèle : il marche donc aussi sans IA, et ne coûte aucun token. La règle est rejouée avec celle des voisins : un fichier sans numéro (`matrix2.txt`) d'une activité « GNF_TD2_2026-2027 » est rangé par elle, et un fichier qui la contredit (`TD1_part7.R` dans cette activité) rejoint ensuite ses voisins.
+
+Elle s'efface, et le modèle tranche, dans les cas suivants :
+- **plusieurs séances** dans la section, l'activité ou le nom du fichier, y compris un intervalle (« TD5-6 », « TP 1 et 2 ») ;
+- **deux types** de séance (« TP du 21 septembre » / « Sujet TD1 », « Practicals » / « TD5 ») ;
+- **numéro dans la section seule** : une section regroupe souvent plusieurs séances ;
+- **CM** : le modèle décide entre un support pour Zotero et un fichier d'accompagnement ;
+- **numérotation locale différente** : si un fichier déjà rangé du même cours nomme une séance de ce type mais n'est pas dans le dossier de ce numéro, la numérotation locale fait foi pour tout ce type de séance ;
+- **dossier refusé** : ni existant ni conforme à `new_dir_patterns`.
+
+Le dossier est celui qui existe déjà pour cette séance. Sinon, il est formé comme ceux des autres séances du même type (`TD/TD03` donne `TD/TD07`), ou à défaut `TD/TD07` ou `TD07`, toujours sous réserve des motifs autorisés. Le fichier est marqué « séance évidente » dans l'état et l'index.
 
 ## Ce que reçoit le modèle
 
@@ -29,7 +44,7 @@ Un appel par cours (par lots de 40 fichiers) avec :
 - des exemples de fichiers déjà rangés : `section | activité | fichier → dossier` ;
 - la liste des fichiers à ranger : section, activité, type d'activité, nom, date.
 
-Il doit répondre uniquement par `{"placements": [{"id", "dest", "confidence", "reason"}]}`. La consigne lui demande de réutiliser un dossier existant quand le fichier appartient à une séance déjà rangée, et de baisser sa confiance au moindre doute sur le type ou le numéro.
+Il doit répondre uniquement par `{"placements": [{"id", "dest", "confidence", "reason"}]}`. La consigne lui demande de réutiliser un dossier existant quand le fichier appartient à une séance déjà rangée, et de baisser sa confiance au moindre doute sur le type ou le numéro. Elle lui rappelle aussi qu'il n'a accès à aucun fichier ni aucune commande. Une réponse vide ou illisible donne lieu à une seconde demande, plus ferme, puis les fichiers vont dans la boîte d'attente. C'est le cas, par exemple, d'Antigravity qui tente de lire un fichier : l'action est refusée, et le tour finit sans réponse.
 
 L'appel passe par la ligne de commande choisie (`scripts/mb/llm.py`), toujours lancée dans un dossier temporaire vide :
 

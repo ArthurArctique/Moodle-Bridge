@@ -31,6 +31,10 @@ class EngineError(Exception):
     pass
 
 
+class NoAnswer(EngineError):
+    """Aucune réponse exploitable (vide ou illisible), sans panne du moteur : une seconde demande peut réussir."""
+
+
 def _resolve(command):
     found = system.find_command(command)
     if not found:
@@ -171,7 +175,14 @@ class GeminiCli:
         if result.get("status") != "SUCCESS" or result.get("finished_reason"):
             reason = result.get("error") or result.get("finished_reason") or result.get("status")
             raise EngineError(f"agy : {str(reason)[:300]}")
-        return result.get("response") or ""
+        response = result.get("response") or ""
+        if not response.strip():
+            # Antigravity est un agent : il lui arrive de tenter un outil (lire un fichier, lancer une commande).
+            # Sans terminal pour l'accepter, l'action est refusée et le tour finit sans réponse.
+            denied = ", ".join(str(action.get("display_name") or action.get("action"))
+                               for action in result.get("denied_actions") or [] if isinstance(action, dict))
+            raise NoAnswer("agy n'a rien répondu" + (f" : il a tenté une action refusée ({denied})" if denied else ""))
+        return response
 
 
 class Command:

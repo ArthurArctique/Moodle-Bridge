@@ -1,4 +1,4 @@
-"""Choix de la destination locale d'un fichier Moodle : voisins, miroir, puis modèle de langage.
+"""Choix de la destination locale d'un fichier Moodle : voisins, séance évidente, miroir, puis modèle de langage.
 
 Toute destination proposée par un modèle est validée ici : elle reste sous la racine du cours
 et doit désigner un dossier existant ou un dossier conforme aux motifs autorisés.
@@ -25,8 +25,13 @@ SYSTEM_PROMPT = (
     "Tu es un module de classement de fichiers appelé par un script, sans humain dans la boucle. "
     "Tu ne converses pas et tu ne poses jamais de question : tu lis la demande et tu réponds uniquement "
     "par l'objet JSON demandé, sans texte avant ni après et sans balises de code. "
+    "Tu n'as accès à aucun fichier, aucune commande ni aucun outil, et tu n'en as pas besoin : tout ce qu'il "
+    "te faut est dans la demande. "
     "Si une information te manque pour un fichier, donne-lui une confiance basse."
 )
+# Ajouté à une seconde demande quand la première n'a rien donné d'exploitable
+RETRY_NOTE = ("\n\nRappel : ta réponse précédente était vide ou illisible. N'essaie d'ouvrir aucun fichier "
+              "ni de lancer aucune commande : tout est ci-dessus. Réponds directement par l'objet JSON demandé.")
 
 
 class _NoEngine(Exception):
@@ -34,6 +39,7 @@ class _NoEngine(Exception):
 
 
 ClassifierError = llm.EngineError if llm else _NoEngine
+NoAnswer = llm.NoAnswer if llm else _NoEngine
 
 
 def normalize_dest(dest):
@@ -103,6 +109,99 @@ def sibling_dest(item, evidence, inbox, min_agreeing=2):
     if len(dirs) >= min_agreeing and len(set(dirs)) == 1:
         return dirs[0], "voisins"
     return None
+
+
+# « TD2 », « TP 03 », « td_4 » ; un intervalle (« TD5-6 », « TP 1 et 2 ») compte pour deux séances
+SESSION = re.compile(r"(?<![a-z])(cm|td|tp)[\s_.-]?0*(\d{1,3})(?!\d)"
+                     r"(?:\s*(?:[-–/&,+]|et|à|and|to)\s*0*(\d{1,3})(?!\d))?", re.IGNORECASE)
+# Type de séance nommé sans numéro : « TP du 21 septembre », « Practicals 5-6 »
+KIND_WORDS = {"CM": r"cms?|cours magistra(?:l|ux)|lectures?", "TD": r"tds?|travaux dirigés|tutorials?",
+              "TP": r"tps?|travaux pratiques|practicals?"}
+KINDS = {kind: re.compile(rf"(?<![a-z])(?:{words})(?![a-z])", re.IGNORECASE) for kind, words in KIND_WORDS.items()}
+
+
+def session_marks(text):
+    """Séances nommées dans un texte : {("TD", 2)}."""
+    marks = set()
+    for kind, first, last in SESSION.findall(util.nfc(text or "")):
+        marks.add((kind.upper(), int(first)))
+        if last:
+            marks.add((kind.upper(), int(last)))
+    return marks
+
+
+def session_of(item):
+    """Le TD ou TP que nomment l'activité ou le fichier, si rien ne le contredit ; sinon None.
+
+    La section peut confirmer ou contredire, jamais suffire : elle regroupe souvent plusieurs séances. Un seul
+    type et un seul numéro dans la section, l'activité et le nom du fichier ; les CM restent au modèle (support
+    pour Zotero, ou fichier d'accompagnement).
+    """
+    names = [item.get("module"), Path(item.get("filename") or "").stem]
+    texts = names + [item.get("section")]
+    marks = set().union(*map(session_marks, texts))
+    kinds = {kind for text in texts for kind, words in KINDS.items() if words.search(util.nfc(text or ""))}
+    if len(marks) != 1 or len(kinds | {kind for kind, _ in marks}) != 1:
+        return None
+    session = next(iter(marks))
+    if session[0] == "CM" or not any(map(session_marks, names)):
+        return None
+    return session
+
+
+def session_dest(item, root, patterns, inbox, known=()):
+    """Dossier d'une séance évidente (« GNF_TD2_2026-2027 » → TD/TD02), ou None.
+
+    `known` : fichiers déjà rangés du même cours. Si l'un d'eux nomme une séance de ce type mais n'est pas dans
+    le dossier de ce numéro, la numérotation locale diffère de celle de Moodle : la règle s'efface et le modèle
+    tranche. Le dossier est celui qui existe déjà pour cette séance, ou un nouveau dossier formé comme ceux des
+    autres séances du même type, toujours validé par `new_dir_patterns`.
+    """
+    session = session_of(item)
+    if not session:
+        return None
+    kind, number = session
+    for other in known:
+        past = session_of(other)
+        if past and past[0] == kind and session_marks(Path(other["dest_dir"]).name) != {past}:
+            return None
+    existing, models = [], []
+    for rel in _course_dirs(root, inbox):
+        marks = session_marks(Path(rel).name)
+        if marks == {session}:
+            existing.append(rel)
+        elif len(marks) == 1 and next(iter(marks))[0] == kind:
+            models.append(rel)
+    if existing:
+        return (existing[0], "séance évidente") if len(existing) == 1 else None
+    candidates = [_renumber(rel, number) for rel in models] + [f"{kind}/{kind}{number:02d}", f"{kind}{number:02d}"]
+    for candidate in candidates:
+        if candidate and validate_dest(candidate, root, patterns, inbox):
+            return candidate, "séance évidente"
+    return None
+
+
+def _course_dirs(root, inbox, depth=2):
+    """Dossiers du cours sur `depth` niveaux (« TD », « TD/TD01 »…), hors boîte d'attente et dossiers cachés."""
+    root = Path(root)
+    found = []
+    for dirpath, dirnames, _ in os.walk(root):
+        rel = Path(dirpath).relative_to(root)
+        keep = sorted(d for d in dirnames if not d.startswith(".") and (rel.parts or d != inbox))
+        dirnames[:] = keep if len(rel.parts) < depth else []
+        if rel.parts:
+            found.append(rel.as_posix())
+    return found
+
+
+def _renumber(rel, number):
+    """« TD/TD01 » → « TD/TD07 » : même forme, même nombre de chiffres ; seul le dernier élément change."""
+    head, _, name = rel.rpartition("/")
+    match = re.search(r"(?<![a-z])(?:cm|td|tp)[\s_.-]?(\d+)", name, re.IGNORECASE)
+    if not match:
+        return None
+    new = name[:match.start(1)] + f"{number:0{len(match.group(1))}d}" + name[match.end(1):]
+    return f"{head}/{new}" if head else new
 
 
 def course_tree(root, inbox, limit=MAX_TREE_LINES):
@@ -208,7 +307,15 @@ def parse_answer(text):
             data = data.get("placements", [])
         if isinstance(data, list):
             return [d for d in data if isinstance(d, dict) and "id" in d]
-    raise ClassifierError("réponse du modèle illisible")
+    raise NoAnswer("réponse du modèle illisible")
+
+
+def ask_placements(classifier, prompt):
+    """Placements proposés ; une seconde demande, plus ferme, si la première n'a rien donné d'exploitable."""
+    try:
+        return parse_answer(classifier.ask(prompt))
+    except NoAnswer:
+        return parse_answer(classifier.ask(prompt + RETRY_NOTE))
 
 
 def make_classifier(settings):
@@ -233,7 +340,7 @@ def classify_course(classifier, conf, course_name, pending, examples, settings, 
         numbered = [{**p, "id": n} for n, p in zip(ids, batch)]
         prompt = build_prompt(conf, course_name, settings.get("rules", ""), context, tree,
                               examples, numbered, min_conf, inbox, zotero_token)
-        for entry in parse_answer(classifier.ask(prompt)):
+        for entry in ask_placements(classifier, prompt):
             key = ids.get(str(entry.get("id")))
             if not key:
                 continue
