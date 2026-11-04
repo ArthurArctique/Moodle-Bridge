@@ -25,7 +25,7 @@ Une petite icône dans la barre des menus. Un clic ouvre un panneau. Une fenêtr
   - les **examens et évaluations** : annonces des 14 derniers jours qui en parlent (convocation, partiel, CC, oral, restitution…), échéances jusqu'à 30 jours.
 
   Les annonces sont triées sur leur titre, par mots-clés : un titre qui annonce un changement (« Report des CC ») compte comme changement, pas comme examen. C'est le même résumé que la section « L'essentiel » de l'accueil du coffre.
-- **Documents** : les derniers arrivés et le dossier où ils ont été rangés, un clic pour les ouvrir.
+- **Documents** : les derniers arrivés, un clic pour les ouvrir. Sous chaque nom, le dossier où il a été rangé (« Matieres › GNF › TD › TD02 »), coupé au milieu s'il est long pour garder le premier et le dernier dossier. Au survol, le bouton dossier l'affiche dans le Finder ; l'infobulle donne le chemin complet et la raison du rangement (cours recopié comme sur Moodle, fichiers voisins, séance, IA…).
 - **Échéances** : devoirs et événements à venir.
 - **Annonces** : un clic affiche le résumé (ou le texte d'une annonce courte), un autre ouvre l'annonce sur Moodle. Le compteur de l'onglet ne montre que les annonces pas encore affichées : il disparaît dès que tu as ouvert l'onglet.
 - **Notes** (si activées) : une nouvelle note arrive en **mystère**, avec un emoji, une couleur et une énigme. Sa valeur ne s'affiche qu'au clic sur « Découvrir ».

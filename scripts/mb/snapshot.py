@@ -25,6 +25,17 @@ MAX_RECENT = 15
 MAX_ANNOUNCEMENTS = summaries.MAX_ANNOUNCEMENTS
 MAX_RUNS = 12
 RECENT_STATUSES = ("placed", "updated", "inbox", "zotero_pending", "in_zotero")
+# Pourquoi un fichier a fini dans son dossier (`decided_by` de l'état), en clair pour l'application
+PLACED_BY = {
+    "miroir": "cours recopié comme sur Moodle, un dossier par section",
+    "voisins": "avec les autres fichiers de la même activité Moodle",
+    "séance évidente": "dossier de la séance que désigne son nom",
+    "modèle": "dossier choisi par l'IA",
+    "correction": "correction enregistrée dans la configuration",
+    "version précédente": "à côté de sa version précédente",
+    "manuel": "rangé à la main",
+    "déjà présent": "un fichier identique était déjà dans ce dossier",
+}
 
 
 def path(cfg):
@@ -42,7 +53,7 @@ def _file(cfg, key, entry):
         "status": entry.get("status"), "placed_at": entry.get("placed_at"),
         "path": str(cfg.resolve(local)) if local else None,
         "folder": Path(local).parent.as_posix() if local else None,
-        "moodle_url": entry.get("module_url"),
+        "moodle_url": entry.get("module_url"), "why": PLACED_BY.get(entry.get("decided_by")),
     }
 
 

@@ -789,7 +789,8 @@ class EssentialsTests(unittest.TestCase):
 class SnapshotTests(unittest.TestCase):
     def _item(self, name, placed_at, status="placed", folder="Cours/TST/TD/TD03"):
         return {"courseid": 10, "course": "M1_TST", "code": "TST", "filename": name, "status": status,
-                "placed_at": placed_at, "local_path": f"{folder}/{name}", "module_url": "https://moodle.test/m"}
+                "placed_at": placed_at, "local_path": f"{folder}/{name}", "module_url": "https://moodle.test/m",
+                "decided_by": "miroir"}
 
     def test_menubar_state(self):
         tmp, cfg = make_env()
@@ -815,6 +816,7 @@ class SnapshotTests(unittest.TestCase):
         # Le lot de l'import initial ne noie pas les vraies nouveautés
         self.assertEqual([f["filename"] for f in snap["recent_files"]], ["td3.pdf", "cm1.pdf"])
         self.assertEqual(snap["recent_files"][0]["folder"], "Cours/TST/TD/TD03")
+        self.assertEqual(snap["recent_files"][0]["why"], snapshot.PLACED_BY["miroir"])
         self.assertEqual([f["filename"] for f in snap["zotero_pending"]], ["cm1.pdf"])
         self.assertEqual([u["name"] for u in snap["upcoming"]], ["Rendu TP"])
         self.assertEqual(snap["announcements"][0]["code"], "TST")

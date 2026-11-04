@@ -85,6 +85,8 @@ struct BridgeFile: Decodable, Identifiable {
     let path: String?
     let folder: String?
     let moodleUrl: String?
+    /// Pourquoi il a fini dans ce dossier (absent des ponts plus anciens)
+    let why: String?
 
     var id: String { key }
 }
@@ -1436,6 +1438,7 @@ struct FileRow: View {
     @EnvironmentObject var bridge: Bridge
     let snap: Snapshot
     let file: BridgeFile
+    @State private var hover = false
 
     var body: some View {
         RowButton(action: { bridge.open(file) }) {
@@ -1443,11 +1446,15 @@ struct FileRow: View {
                 CodeBadge(code: file.code)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(file.filename).font(.callout).lineLimit(1).truncationMode(.middle)
-                    Text(destination)
-                        .font(.caption)
-                        .foregroundStyle(destinationColor)
-                        .lineLimit(1)
-                        .truncationMode(.head)
+                    // Tronqué au milieu : le dossier de départ et le dossier final restent lisibles
+                    Label {
+                        Text(destination).lineLimit(1).truncationMode(.middle)
+                    } icon: {
+                        Image(systemName: destinationIcon)
+                    }
+                    .labelStyle(DestinationLabelStyle())
+                    .font(.caption)
+                    .foregroundStyle(destinationColor)
                 }
                 Spacer(minLength: 4)
                 VStack(alignment: .trailing, spacing: 1) {
@@ -1458,22 +1465,50 @@ struct FileRow: View {
                         Text(Fmt.ago(placed, now: bridge.now)).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
+                .opacity(canReveal && hover ? 0 : 1)
             }
         }
+        // Au survol, la date laisse la place au Finder
+        .overlay(alignment: .trailing) {
+            if canReveal && hover {
+                Button { bridge.reveal(file) } label: {
+                    Image(systemName: "folder").font(.callout).frame(width: 26, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .help("Afficher dans le Finder")
+                .padding(.trailing, 4)
+            }
+        }
+        .onHover { hover = $0 }
         .contextMenu {
             Button("Ouvrir") { bridge.open(file) }
-            Button("Afficher dans le Finder") { bridge.reveal(file) }
+            if canReveal { Button("Afficher dans le Finder") { bridge.reveal(file) } }
             if file.moodleUrl != nil { Button("Ouvrir sur Moodle") { bridge.openURL(file.moodleUrl) } }
         }
-        .help(file.path ?? file.filename)
+        .help(tooltip)
+    }
+
+    private var canReveal: Bool { file.path != nil && file.status != "zotero_pending" && file.status != "in_zotero" }
+
+    /// « Matieres › GNF › TD › TD02 » plutôt que « Matieres/GNF/TD/TD02 »
+    private var crumbs: String {
+        (file.folder ?? "").split(separator: "/").joined(separator: " › ")
     }
 
     private var destination: String {
         switch file.status {
-        case "inbox": return "à classer · \(file.folder ?? "")"
+        case "inbox": return "à classer · \(crumbs)"
         case "zotero_pending": return "à importer dans Zotero"
         case "in_zotero": return "dans Zotero"
-        default: return "→ \(file.folder ?? "")"
+        default: return crumbs
+        }
+    }
+
+    private var destinationIcon: String {
+        switch file.status {
+        case "inbox": return "tray"
+        case "zotero_pending", "in_zotero": return "books.vertical"
+        default: return "folder"
         }
     }
 
@@ -1482,6 +1517,20 @@ struct FileRow: View {
         case "inbox": return .orange
         case "zotero_pending", "in_zotero": return .purple
         default: return .secondary
+        }
+    }
+
+    private var tooltip: String {
+        [file.path ?? file.filename, file.why.map { "Rangé ici : \($0)." }].compactMap { $0 }.joined(separator: "\n")
+    }
+}
+
+/// Icône et texte serrés, l'icône alignée sur la première ligne
+struct DestinationLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            configuration.icon.imageScale(.small)
+            configuration.title
         }
     }
 }

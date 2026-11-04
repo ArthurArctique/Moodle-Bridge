@@ -79,7 +79,7 @@ struct DemoData {
             file("1", "STAT", "TP4_regression_logistique.pdf", "Statistiques/TP/TP04", 25),
             file("2", "BIO", "TD3_alignement_de_sequences.pdf", "Biologie/TD/TD03", 130),
             file("3", "GEN", "TD2_croisements.pdf", "Génétique/TD/TD02", 26 * 60),
-            file("4", "ANG", "Unit_4_vocabulary.pdf", "Anglais/Unit 4", 50 * 60),
+            file("4", "ANG", "Unit_4_vocabulary.pdf", "Anglais/Moodle/Unit 4 - Vocabulary and pronunciation", 50 * 60),
             file("5", "STAT", "TP3_donnees.csv", "Statistiques/TP/TP03", 74 * 60),
             file("6", "BIO", "CM04_phylogenie.pdf", "Biologie/CM/CM04", 98 * 60),
         ]
